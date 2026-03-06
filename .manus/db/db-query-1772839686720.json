@@ -1,0 +1,9 @@
+{
+  "query": "CREATE TABLE `referral_link_visits` (\n  `id` int AUTO_INCREMENT NOT NULL,\n  `promoterId` int NOT NULL,\n  `visitedAt` timestamp NOT NULL DEFAULT (now()),\n  `userAgent` varchar(512),\n  `ipAddress` varchar(64),\n  CONSTRAINT `referral_link_visits_id` PRIMARY KEY(`id`)\n);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3WQULgVDBb1t2sq.a48dca79cd35 --database MTFTFa6mJvR7VEHb68qsYm --execute CREATE TABLE `referral_link_visits` (\n  `id` int AUTO_INCREMENT NOT NULL,\n  `promoterId` int NOT NULL,\n  `visitedAt` timestamp NOT NULL DEFAULT (now()),\n  `userAgent` varchar(512),\n  `ipAddress` varchar(64),\n  CONSTRAINT `referral_link_visits_id` PRIMARY KEY(`id`)\n);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 463
+}

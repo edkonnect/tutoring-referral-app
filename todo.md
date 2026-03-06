@@ -48,3 +48,12 @@
 - [x] Promoter dashboard: display referral link with copy button
 - [x] Promoter dashboard: referral link card with copy, share, preview, and regenerate
 - [x] Vitest tests for referral link generation and public registration (8 tests)
+
+## Referral Link Visit Tracking
+- [x] Add referral_link_visits table (id, promoter_id, visited_at, user_agent, ip)
+- [x] DB helpers: logReferralVisit, getReferralVisitStats, getAllPromoterVisitStats
+- [x] tRPC: public logVisit mutation, promoter getVisitStats query, admin getAllVisitStats query
+- [x] Public registration page logs a visit on load (once per page load via useRef guard)
+- [x] Promoter dashboard: ReferralLinkCard shows total visits, this week, and today
+- [x] Admin Promoters table: Link Visits column with per-promoter total count
+- [x] Vitest tests for visit logging and stats (7 new tests, 29 total passing)

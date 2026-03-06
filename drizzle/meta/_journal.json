@@ -22,6 +22,13 @@
       "when": 1772826409571,
       "tag": "0002_illegal_ogun",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1772839678742,
+      "tag": "0003_superb_ser_duncan",
+      "breakpoints": true
     }
   ]
 }

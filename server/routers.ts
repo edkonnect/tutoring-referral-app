@@ -20,7 +20,10 @@ import {
   getStudentsByParent,
   getStudentsByPromoter,
   getUserById,
+  getAllPromoterVisitStats,
+  getReferralVisitStats,
   getUserByReferralToken,
+  logReferralVisit,
   markReferralPaid,
   setReferralToken,
   updateParent,
@@ -335,6 +338,29 @@ const referralLinkRouter = router({
         promoterName: promoter.name ?? "Your Promoter",
       };
     }),
+
+  // Public: log a visit to a referral link page
+  logVisit: publicProcedure
+    .input(z.object({ token: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      const promoter = await getUserByReferralToken(input.token);
+      if (!promoter) return { success: false };
+      const userAgent = (ctx.req.headers["user-agent"] as string | undefined) ?? undefined;
+      const forwarded = ctx.req.headers["x-forwarded-for"] as string | undefined;
+      const ipAddress = forwarded ? forwarded.split(",")[0]?.trim() : (ctx.req.socket?.remoteAddress ?? undefined);
+      await logReferralVisit({ promoterId: promoter.id, userAgent, ipAddress });
+      return { success: true };
+    }),
+
+  // Promoter: get visit stats for own referral link
+  getVisitStats: promoterProcedure.query(async ({ ctx }) => {
+    return getReferralVisitStats(ctx.user.id);
+  }),
+
+  // Admin: get visit stats for all promoters
+  getAllVisitStats: adminProcedure.query(async () => {
+    return getAllPromoterVisitStats();
+  }),
 
   // Public: register a parent via a referral link (no auth required)
   registerParent: publicProcedure

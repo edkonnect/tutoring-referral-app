@@ -1,6 +1,6 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq, gte, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, parents, referrals, students, users } from "../drizzle/schema";
+import { InsertUser, parents, referralLinkVisits, referrals, students, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -253,6 +253,74 @@ export async function setReferralToken(userId: number, token: string) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   await db.update(users).set({ referralToken: token }).where(eq(users.id, userId));
+}
+
+// ─── Referral Link Visits ────────────────────────────────────────────────────
+
+export async function logReferralVisit(data: {
+  promoterId: number;
+  userAgent?: string;
+  ipAddress?: string;
+}) {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(referralLinkVisits).values(data);
+}
+
+export async function getReferralVisitStats(promoterId: number) {
+  const db = await getDb();
+  if (!db) return { total: 0, thisWeek: 0, today: 0 };
+
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfWeek = new Date(startOfToday);
+  startOfWeek.setDate(startOfToday.getDate() - startOfToday.getDay()); // Sunday
+
+  const [totalRows, weekRows, todayRows] = await Promise.all([
+    db
+      .select({ cnt: count() })
+      .from(referralLinkVisits)
+      .where(eq(referralLinkVisits.promoterId, promoterId)),
+    db
+      .select({ cnt: count() })
+      .from(referralLinkVisits)
+      .where(
+        and(
+          eq(referralLinkVisits.promoterId, promoterId),
+          gte(referralLinkVisits.visitedAt, startOfWeek)
+        )
+      ),
+    db
+      .select({ cnt: count() })
+      .from(referralLinkVisits)
+      .where(
+        and(
+          eq(referralLinkVisits.promoterId, promoterId),
+          gte(referralLinkVisits.visitedAt, startOfToday)
+        )
+      ),
+  ]);
+
+  return {
+    total: Number(totalRows[0]?.cnt ?? 0),
+    thisWeek: Number(weekRows[0]?.cnt ?? 0),
+    today: Number(todayRows[0]?.cnt ?? 0),
+  };
+}
+
+export async function getAllPromoterVisitStats() {
+  const db = await getDb();
+  if (!db) return [];
+
+  const rows = await db
+    .select({
+      promoterId: referralLinkVisits.promoterId,
+      total: count(),
+    })
+    .from(referralLinkVisits)
+    .groupBy(referralLinkVisits.promoterId);
+
+  return rows.map((r) => ({ promoterId: r.promoterId, total: Number(r.total) }));
 }
 
 export async function getStudentsByPromoter(promoterId: number) {

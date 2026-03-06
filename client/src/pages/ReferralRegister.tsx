@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { GraduationCap, CheckCircle, AlertCircle, Loader2, ArrowRight } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams } from "wouter";
 
 type FormState = {
@@ -25,6 +25,17 @@ export default function ReferralRegister() {
   const [submitted, setSubmitted] = useState(false);
   const [promoterNameOnSuccess, setPromoterNameOnSuccess] = useState("");
   const [errors, setErrors] = useState<Partial<FormState>>({});
+  const visitLogged = useRef(false);
+
+  const logVisitMutation = trpc.referralLink.logVisit.useMutation();
+
+  // Log the visit once when the page loads (after token is confirmed valid)
+  useEffect(() => {
+    if (!token || visitLogged.current) return;
+    visitLogged.current = true;
+    logVisitMutation.mutate({ token });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   // Resolve the token to get promoter info
   const { data: promoterInfo, isLoading: resolving, error: resolveError } =

@@ -8,6 +8,9 @@ import {
   CheckCheck,
   ExternalLink,
   Share2,
+  Eye,
+  TrendingUp,
+  CalendarDays,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -15,11 +18,14 @@ import { toast } from "sonner";
 export default function ReferralLinkCard() {
   const utils = trpc.useUtils();
   const { data, isLoading } = trpc.referralLink.getMyToken.useQuery();
+  const { data: visitStats, isLoading: statsLoading } =
+    trpc.referralLink.getVisitStats.useQuery();
   const [copied, setCopied] = useState(false);
 
   const regenerateMutation = trpc.referralLink.regenerateToken.useMutation({
     onSuccess: () => {
       utils.referralLink.getMyToken.invalidate();
+      utils.referralLink.getVisitStats.invalidate();
       toast.success("Referral link regenerated. Your old link is now invalid.");
     },
     onError: (e) => toast.error(e.message),
@@ -66,10 +72,36 @@ export default function ReferralLinkCard() {
           Your Referral Link
         </CardTitle>
         <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">
-          Share this link with parents. When they register, they'll be automatically linked to your account and you'll earn a $50 credit once their child is enrolled.
+          Share this link with parents. When they register, they'll be automatically
+          linked to your account and you'll earn a $50 credit once their child is enrolled.
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Visit stats row */}
+        <div className="grid grid-cols-3 gap-3">
+          <VisitStat
+            icon={Eye}
+            label="Total Visits"
+            value={visitStats?.total ?? 0}
+            loading={statsLoading}
+            color="blue"
+          />
+          <VisitStat
+            icon={CalendarDays}
+            label="This Week"
+            value={visitStats?.thisWeek ?? 0}
+            loading={statsLoading}
+            color="indigo"
+          />
+          <VisitStat
+            icon={TrendingUp}
+            label="Today"
+            value={visitStats?.today ?? 0}
+            loading={statsLoading}
+            color="emerald"
+          />
+        </div>
+
         {/* Link display */}
         <div className="flex items-center gap-2">
           <div className="flex-1 min-w-0 bg-muted/50 border rounded-lg px-3 py-2.5">
@@ -164,5 +196,38 @@ export default function ReferralLinkCard() {
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function VisitStat({
+  icon: Icon,
+  label,
+  value,
+  loading,
+  color,
+}: {
+  icon: React.ElementType;
+  label: string;
+  value: number;
+  loading: boolean;
+  color: "blue" | "indigo" | "emerald";
+}) {
+  const colorMap = {
+    blue: "bg-blue-50 text-blue-600",
+    indigo: "bg-indigo-50 text-indigo-600",
+    emerald: "bg-emerald-50 text-emerald-600",
+  };
+  return (
+    <div className="flex flex-col items-center justify-center gap-1 p-3 bg-muted/30 border rounded-lg text-center">
+      <div className={`h-7 w-7 rounded-md flex items-center justify-center ${colorMap[color]}`}>
+        <Icon className="h-3.5 w-3.5" />
+      </div>
+      {loading ? (
+        <div className="h-5 w-8 bg-muted animate-pulse rounded mt-0.5" />
+      ) : (
+        <p className="text-lg font-semibold text-foreground leading-none">{value}</p>
+      )}
+      <p className="text-[10px] text-muted-foreground leading-tight">{label}</p>
+    </div>
   );
 }

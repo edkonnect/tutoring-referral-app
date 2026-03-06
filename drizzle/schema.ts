@@ -73,3 +73,15 @@ export const referrals = mysqlTable("referrals", {
 
 export type Referral = typeof referrals.$inferSelect;
 export type InsertReferral = typeof referrals.$inferInsert;
+
+// Visit log: one record per page load of /refer/:token
+export const referralLinkVisits = mysqlTable("referral_link_visits", {
+  id: int("id").autoincrement().primaryKey(),
+  promoterId: int("promoterId").notNull(),
+  visitedAt: timestamp("visitedAt").defaultNow().notNull(),
+  userAgent: varchar("userAgent", { length: 512 }),
+  ipAddress: varchar("ipAddress", { length: 64 }),
+});
+
+export type ReferralLinkVisit = typeof referralLinkVisits.$inferSelect;
+export type InsertReferralLinkVisit = typeof referralLinkVisits.$inferInsert;

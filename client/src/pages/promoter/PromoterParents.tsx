@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { Plus, Pencil, Trash2, Mail, Phone, Users } from "lucide-react";
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { toast } from "sonner";
 
 type ParentForm = {
@@ -27,6 +28,7 @@ const emptyForm: ParentForm = { name: "", email: "", phone: "", notes: "" };
 
 export default function PromoterParents() {
   const utils = trpc.useUtils();
+  const [, navigate] = useLocation();
   const { data: parents, isLoading } = trpc.parents.list.useQuery();
 
   const [showDialog, setShowDialog] = useState(false);
@@ -99,7 +101,7 @@ export default function PromoterParents() {
             <h1 className="text-2xl font-semibold text-foreground">My Parents</h1>
             <p className="text-muted-foreground mt-1">Manage your referred parents</p>
           </div>
-          <Button onClick={openAdd} className="gap-2">
+          <Button onClick={() => navigate("/promoter/parents/new")} className="gap-2">
             <Plus className="h-4 w-4" />
             Add Parent
           </Button>
@@ -119,7 +121,7 @@ export default function PromoterParents() {
               <p className="text-sm text-muted-foreground mt-1 mb-4">
                 Add your first referred parent to get started.
               </p>
-              <Button onClick={openAdd} variant="outline" className="gap-2">
+              <Button onClick={() => navigate("/promoter/parents/new")} variant="outline" className="gap-2">
                 <Plus className="h-4 w-4" />
                 Add Parent
               </Button>

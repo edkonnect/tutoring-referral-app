@@ -57,3 +57,17 @@
 - [x] Promoter dashboard: ReferralLinkCard shows total visits, this week, and today
 - [x] Admin Promoters table: Link Visits column with per-promoter total count
 - [x] Vitest tests for visit logging and stats (7 new tests, 29 total passing)
+
+## Conversion Rate Feature
+- [ ] Backend: extend getVisitStats to include registrations count and conversionRate
+- [ ] ReferralLinkCard: display conversion rate stat (registrations / visits × 100%)
+- [ ] Vitest tests for conversion rate calculation
+
+## Parent Information Entry Screen
+- [x] Dedicated AddParent page with parent details form (name, email, phone, notes)
+- [x] Optional inline student section to add one or more students in the same flow
+- [x] Form validation with clear error messages
+- [x] Success state with options to add another parent or view all parents
+- [x] Navigation: Add Parent button on PromoterParents list and dashboard quick action
+- [x] Route /promoter/parents/new registered in App.tsx
+- [x] Vitest tests for parent creation with and without students (7 tests, 36 total passing)

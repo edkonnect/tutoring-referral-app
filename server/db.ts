@@ -269,14 +269,14 @@ export async function logReferralVisit(data: {
 
 export async function getReferralVisitStats(promoterId: number) {
   const db = await getDb();
-  if (!db) return { total: 0, thisWeek: 0, today: 0 };
+  if (!db) return { total: 0, thisWeek: 0, today: 0, registrations: 0, conversionRate: 0 };
 
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const startOfWeek = new Date(startOfToday);
   startOfWeek.setDate(startOfToday.getDate() - startOfToday.getDay()); // Sunday
 
-  const [totalRows, weekRows, todayRows] = await Promise.all([
+  const [totalRows, weekRows, todayRows, registrationRows] = await Promise.all([
     db
       .select({ cnt: count() })
       .from(referralLinkVisits)
@@ -299,12 +299,24 @@ export async function getReferralVisitStats(promoterId: number) {
           gte(referralLinkVisits.visitedAt, startOfToday)
         )
       ),
+    // Count parents registered via this promoter's referral link
+    db
+      .select({ cnt: count() })
+      .from(parents)
+      .where(eq(parents.promoterId, promoterId)),
   ]);
 
+  const totalVisits = Number(totalRows[0]?.cnt ?? 0);
+  const registrations = Number(registrationRows[0]?.cnt ?? 0);
+  const conversionRate =
+    totalVisits > 0 ? Math.round((registrations / totalVisits) * 100 * 10) / 10 : 0;
+
   return {
-    total: Number(totalRows[0]?.cnt ?? 0),
+    total: totalVisits,
     thisWeek: Number(weekRows[0]?.cnt ?? 0),
     today: Number(todayRows[0]?.cnt ?? 0),
+    registrations,
+    conversionRate,
   };
 }
 

@@ -75,7 +75,7 @@ export default function PromoterDashboard() {
           <QuickAction
             title="Add a Parent"
             description="Register a new referred parent and their contact details."
-            onClick={() => setLocation("/promoter/parents")}
+            onClick={() => setLocation("/promoter/parents/new")}
           />
           <QuickAction
             title="Add a Student"

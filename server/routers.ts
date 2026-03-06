@@ -20,7 +20,9 @@ import {
   getStudentsByParent,
   getStudentsByPromoter,
   getUserById,
+  getUserByReferralToken,
   markReferralPaid,
+  setReferralToken,
   updateParent,
   updateStudent,
 } from "./db";
@@ -299,6 +301,61 @@ const adminRouter = router({
   }),
 });
 
+// ─── Referral Link Router ────────────────────────────────────────────────────
+
+const referralLinkRouter = router({
+  // Get or generate a referral token for the logged-in promoter
+  getMyToken: promoterProcedure.query(async ({ ctx }) => {
+    const user = await getUserById(ctx.user.id);
+    if (!user) throw new TRPCError({ code: "NOT_FOUND" });
+    if (user.referralToken) return { token: user.referralToken };
+    // Generate a new unique token using nanoid-style random string
+    const { nanoid } = await import("nanoid");
+    const token = nanoid(16);
+    await setReferralToken(ctx.user.id, token);
+    return { token };
+  }),
+
+  // Regenerate token (invalidates old link)
+  regenerateToken: promoterProcedure.mutation(async ({ ctx }) => {
+    const { nanoid } = await import("nanoid");
+    const token = nanoid(16);
+    await setReferralToken(ctx.user.id, token);
+    return { token };
+  }),
+
+  // Public: resolve a token to promoter info (for the registration page)
+  resolveToken: publicProcedure
+    .input(z.object({ token: z.string() }))
+    .query(async ({ input }) => {
+      const promoter = await getUserByReferralToken(input.token);
+      if (!promoter) throw new TRPCError({ code: "NOT_FOUND", message: "Invalid referral link" });
+      return {
+        promoterId: promoter.id,
+        promoterName: promoter.name ?? "Your Promoter",
+      };
+    }),
+
+  // Public: register a parent via a referral link (no auth required)
+  registerParent: publicProcedure
+    .input(
+      z.object({
+        token: z.string(),
+        name: z.string().min(1, "Name is required"),
+        email: z.string().email("Valid email required"),
+        phone: z.string().optional(),
+        notes: z.string().optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const promoter = await getUserByReferralToken(input.token);
+      if (!promoter) throw new TRPCError({ code: "NOT_FOUND", message: "Invalid referral link" });
+      const { token, ...parentData } = input;
+      await createParent({ ...parentData, promoterId: promoter.id });
+      return { success: true, promoterName: promoter.name ?? "Your Promoter" };
+    }),
+});
+
 // ─── Promoter Router ──────────────────────────────────────────────────────────
 
 const promoterRouter = router({
@@ -334,6 +391,7 @@ export const appRouter = router({
   referrals: referralsRouter,
   admin: adminRouter,
   promoter: promoterRouter,
+  referralLink: referralLinkRouter,
 });
 
 export type AppRouter = typeof appRouter;

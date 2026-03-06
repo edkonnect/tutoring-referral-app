@@ -240,6 +240,21 @@ export async function getPendingReferrals() {
   return db.select().from(referrals).where(eq(referrals.status, "pending")).orderBy(desc(referrals.createdAt));
 }
 
+// ─── Referral Tokens ─────────────────────────────────────────────────────────
+
+export async function getUserByReferralToken(token: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(users).where(eq(users.referralToken, token)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function setReferralToken(userId: number, token: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(users).set({ referralToken: token }).where(eq(users.id, userId));
+}
+
 export async function getStudentsByPromoter(promoterId: number) {
   const db = await getDb();
   if (!db) return [];

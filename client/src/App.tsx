@@ -20,6 +20,9 @@ import PromoterParents from "./pages/promoter/PromoterParents";
 import PromoterStudents from "./pages/promoter/PromoterStudents";
 import PromoterEarnings from "./pages/promoter/PromoterEarnings";
 
+// Public pages
+import ReferralRegister from "./pages/ReferralRegister";
+
 function Router() {
   return (
     <Switch>
@@ -38,6 +41,9 @@ function Router() {
       <Route path="/promoter/parents" component={PromoterParents} />
       <Route path="/promoter/students" component={PromoterStudents} />
       <Route path="/promoter/earnings" component={PromoterEarnings} />
+
+      {/* Public referral registration - no auth required */}
+      <Route path="/refer/:token" component={ReferralRegister} />
 
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />

@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
 import { Users, GraduationCap, DollarSign, Clock, CheckCircle, TrendingUp } from "lucide-react";
 import { useLocation } from "wouter";
+import ReferralLinkCard from "@/components/ReferralLinkCard";
 
 export default function PromoterDashboard() {
   const { data: stats, isLoading } = trpc.promoter.getStats.useQuery();
@@ -62,6 +63,11 @@ export default function PromoterDashboard() {
             loading={isLoading}
             color="purple"
           />
+        </div>
+
+        {/* Referral Link */}
+        <div className="mb-8">
+          <ReferralLinkCard />
         </div>
 
         {/* Quick actions */}

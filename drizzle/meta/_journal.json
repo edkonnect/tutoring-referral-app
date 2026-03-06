@@ -15,6 +15,13 @@
       "when": 1772772018138,
       "tag": "0001_long_sue_storm",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1772826409571,
+      "tag": "0002_illegal_ogun",
+      "breakpoints": true
     }
   ]
 }

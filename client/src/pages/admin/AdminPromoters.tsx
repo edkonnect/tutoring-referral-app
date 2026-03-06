@@ -1,7 +1,88 @@
 import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
-import { Users, Mail } from "lucide-react";
+import { Users, Mail, Link2, Copy, ExternalLink } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
+
+type Promoter = {
+  id: number;
+  name: string | null;
+  email: string | null;
+  loginMethod: string | null;
+  createdAt: Date;
+  lastSignedIn: Date;
+  referralToken: string | null;
+};
+
+function PromoterRow({ promoter: p }: { promoter: Promoter }) {
+  const [copied, setCopied] = useState(false);
+  const referralUrl = p.referralToken
+    ? `${window.location.origin}/refer/${p.referralToken}`
+    : null;
+
+  const handleCopy = async () => {
+    if (!referralUrl) return;
+    try {
+      await navigator.clipboard.writeText(referralUrl);
+      setCopied(true);
+      toast.success("Referral link copied!");
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Could not copy to clipboard.");
+    }
+  };
+
+  return (
+    <tr className="border-b last:border-0 hover:bg-muted/20 transition-colors">
+      <td className="px-4 py-3 font-medium text-foreground">
+        {p.name || <span className="text-muted-foreground italic">No name</span>}
+      </td>
+      <td className="px-4 py-3 text-muted-foreground">
+        <span className="flex items-center gap-1.5">
+          <Mail className="h-3.5 w-3.5" />
+          {p.email || "—"}
+        </span>
+      </td>
+      <td className="px-4 py-3 text-muted-foreground capitalize">
+        {p.loginMethod || "—"}
+      </td>
+      <td className="px-4 py-3 text-muted-foreground">
+        {new Date(p.createdAt).toLocaleDateString()}
+      </td>
+      <td className="px-4 py-3 text-muted-foreground">
+        {new Date(p.lastSignedIn).toLocaleDateString()}
+      </td>
+      <td className="px-4 py-3">
+        {referralUrl ? (
+          <div className="flex items-center gap-1">
+            <span className="text-xs text-muted-foreground font-mono truncate max-w-[140px]">
+              /refer/{p.referralToken}
+            </span>
+            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleCopy} title="Copy link">
+              <Copy className={`h-3 w-3 ${copied ? "text-emerald-600" : ""}`} />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={() => window.open(referralUrl, "_blank")}
+              title="Preview"
+            >
+              <ExternalLink className="h-3 w-3" />
+            </Button>
+          </div>
+        ) : (
+          <span className="flex items-center gap-1 text-xs text-muted-foreground italic">
+            <Link2 className="h-3 w-3" />
+            Not generated
+          </span>
+        )}
+      </td>
+    </tr>
+  );
+}
 
 export default function AdminPromoters() {
   const { data: promoters, isLoading } = trpc.admin.listPromoters.useQuery();
@@ -43,30 +124,12 @@ export default function AdminPromoters() {
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">Login Method</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">Joined</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">Last Sign In</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Referral Link</th>
                   </tr>
                 </thead>
                 <tbody>
                   {promoters.map((p) => (
-                    <tr key={p.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
-                      <td className="px-4 py-3 font-medium text-foreground">
-                        {p.name || <span className="text-muted-foreground italic">No name</span>}
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground">
-                        <span className="flex items-center gap-1.5">
-                          <Mail className="h-3.5 w-3.5" />
-                          {p.email || "—"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground capitalize">
-                        {p.loginMethod || "—"}
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground">
-                        {new Date(p.createdAt).toLocaleDateString()}
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground">
-                        {new Date(p.lastSignedIn).toLocaleDateString()}
-                      </td>
-                    </tr>
+                    <PromoterRow key={p.id} promoter={p} />
                   ))}
                 </tbody>
               </table>

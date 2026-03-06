@@ -38,3 +38,13 @@
 - [x] Vitest tests for referral creation
 - [x] Vitest tests for enrollment confirmation and credit logic
 - [x] Vitest tests for payout marking
+
+## Referral Link Feature
+- [x] Add referralToken column to users table (unique, nanoid-generated)
+- [x] Backend: generate/get referral token for promoter
+- [x] Backend: public endpoint to resolve token → promoter info
+- [x] Backend: public endpoint for parent self-registration via referral link
+- [x] Public referral registration page (no login required)
+- [x] Promoter dashboard: display referral link with copy button
+- [x] Promoter dashboard: referral link card with copy, share, preview, and regenerate
+- [x] Vitest tests for referral link generation and public registration (8 tests)

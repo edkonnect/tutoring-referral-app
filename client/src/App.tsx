@@ -18,6 +18,7 @@ import AdminPayouts from "./pages/admin/AdminPayouts";
 import PromoterDashboard from "./pages/promoter/PromoterDashboard";
 import PromoterParents from "./pages/promoter/PromoterParents";
 import AddParent from "./pages/promoter/AddParent";
+import EditParent from "./pages/promoter/EditParent";
 import PromoterStudents from "./pages/promoter/PromoterStudents";
 import PromoterEarnings from "./pages/promoter/PromoterEarnings";
 
@@ -40,6 +41,7 @@ function Router() {
       {/* Promoter routes */}
       <Route path="/promoter" component={PromoterDashboard} />
       <Route path="/promoter/parents/new" component={AddParent} />
+      <Route path="/promoter/parents/:id/edit" component={EditParent} />
       <Route path="/promoter/parents" component={PromoterParents} />
       <Route path="/promoter/students" component={PromoterStudents} />
       <Route path="/promoter/earnings" component={PromoterEarnings} />

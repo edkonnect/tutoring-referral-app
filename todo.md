@@ -71,3 +71,14 @@
 - [x] Navigation: Add Parent button on PromoterParents list and dashboard quick action
 - [x] Route /promoter/parents/new registered in App.tsx
 - [x] Vitest tests for parent creation with and without students (7 tests, 36 total passing)
+
+## Edit Parent Form
+- [x] EditParent page at /promoter/parents/:id/edit pre-populated with existing data
+- [x] Parent fields (name, email, phone, notes) pre-filled and editable
+- [x] Existing students listed inline with edit and delete per student
+- [x] Add new students inline from the edit page
+- [x] Form validation matching AddParent screen
+- [x] Success state navigating back to parents list
+- [x] Edit button on PromoterParents list cards navigates to edit page
+- [x] Route /promoter/parents/:id/edit registered in App.tsx
+- [x] Vitest tests for parent update and student management (8 tests, 44 total passing)

@@ -156,7 +156,8 @@ export default function PromoterParents() {
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8"
-                        onClick={() => openEdit(p)}
+                        title="Edit parent"
+                        onClick={() => navigate(`/promoter/parents/${p.id}/edit`)}
                       >
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>

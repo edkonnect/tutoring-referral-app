@@ -108,3 +108,17 @@
 
 ### Tests
 - [x] Vitest tests for promoter CRUD (admin-only guards) — 13 tests, 57 total passing
+
+## Promoter Invite & Email/Password Auth
+- [x] DB: promoter_invites table (token, user_id, expires_at, used_at)
+- [x] DB: promoter_credentials table (user_id, password_hash)
+- [x] Backend: generate invite token on admin createPromoter
+- [x] Backend: send confirmation email with setup link on promoter creation
+- [x] Backend: public resolveInvite procedure (validate token)
+- [x] Backend: public setupAccount procedure (set email + password, mark invite used)
+- [x] Backend: public promoterLogin procedure (email + password → JWT session cookie)
+- [x] Backend: resendInvite admin procedure (resends invite email)
+- [x] Public Account Setup page (/setup/:token) — set email + password
+- [x] Landing page: email/password login form for promoters
+- [x] Landing page: show both Manus OAuth and email/password login options
+- [x] Vitest tests for invite flow, setup, and login (12 tests, 69 total passing)

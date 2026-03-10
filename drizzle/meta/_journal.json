@@ -29,6 +29,13 @@
       "when": 1772839678742,
       "tag": "0003_superb_ser_duncan",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1773107346486,
+      "tag": "0004_empty_franklin_richards",
+      "breakpoints": true
     }
   ]
 }

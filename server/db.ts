@@ -1,6 +1,6 @@
 import { and, count, desc, eq, gte, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, parents, referralLinkVisits, referrals, students, users } from "../drizzle/schema";
+import { InsertUser, parents, promoterCredentials, promoterInvites, referralLinkVisits, referrals, students, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -367,6 +367,46 @@ export async function getAllPromoterVisitStats() {
     .groupBy(referralLinkVisits.promoterId);
 
   return rows.map((r) => ({ promoterId: r.promoterId, total: Number(r.total) }));
+}
+
+// ─── Promoter Invites ────────────────────────────────────────────────────────
+
+export async function createInvite(userId: number, token: string, expiresAt: Date) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  // Invalidate any existing unused invite for this user
+  await db.delete(promoterInvites).where(eq(promoterInvites.userId, userId));
+  await db.insert(promoterInvites).values({ userId, token, expiresAt });
+}
+
+export async function getInviteByToken(token: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(promoterInvites).where(eq(promoterInvites.token, token)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function markInviteUsed(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(promoterInvites).set({ usedAt: new Date() }).where(eq(promoterInvites.id, id));
+}
+
+// ─── Promoter Credentials ────────────────────────────────────────────────────
+
+export async function createCredentials(userId: number, email: string, passwordHash: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.insert(promoterCredentials).values({ userId, email, passwordHash });
+  // Also update the users table email
+  await db.update(users).set({ email, loginMethod: "email" }).where(eq(users.id, userId));
+}
+
+export async function getCredentialsByEmail(email: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(promoterCredentials).where(eq(promoterCredentials.email, email)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
 }
 
 export async function getStudentsByPromoter(promoterId: number) {

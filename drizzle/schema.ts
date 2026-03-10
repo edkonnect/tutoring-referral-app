@@ -85,3 +85,29 @@ export const referralLinkVisits = mysqlTable("referral_link_visits", {
 
 export type ReferralLinkVisit = typeof referralLinkVisits.$inferSelect;
 export type InsertReferralLinkVisit = typeof referralLinkVisits.$inferInsert;
+
+// Invite tokens sent to new promoters so they can set up their account
+export const promoterInvites = mysqlTable("promoter_invites", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),          // references users.id
+  token: varchar("token", { length: 64 }).notNull().unique(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  usedAt: timestamp("usedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type PromoterInvite = typeof promoterInvites.$inferSelect;
+export type InsertPromoterInvite = typeof promoterInvites.$inferInsert;
+
+// Email + hashed password for promoters who log in with credentials
+export const promoterCredentials = mysqlTable("promoter_credentials", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().unique(), // references users.id
+  email: varchar("email", { length: 320 }).notNull().unique(),
+  passwordHash: varchar("passwordHash", { length: 255 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type PromoterCredential = typeof promoterCredentials.$inferSelect;
+export type InsertPromoterCredential = typeof promoterCredentials.$inferInsert;

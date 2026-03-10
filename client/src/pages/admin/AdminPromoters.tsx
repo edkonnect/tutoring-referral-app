@@ -36,6 +36,8 @@ import {
   Search,
   Calendar,
   Eye,
+  Send,
+  Loader2,
 } from "lucide-react";
 import { useState, useMemo } from "react";
 import { toast } from "sonner";
@@ -111,6 +113,11 @@ export default function AdminPromoters() {
     onError: (e) => toast.error(e.message),
   });
 
+  const resendInviteMutation = trpc.admin.resendInvite.useMutation({
+    onSuccess: () => toast.success("Invitation email resent!"),
+    onError: (e) => toast.error(e.message),
+  });
+
   const deleteMutation = trpc.admin.deletePromoter.useMutation({
     onSuccess: () => {
       toast.success("Promoter deleted.");
@@ -127,7 +134,7 @@ export default function AdminPromoters() {
   const handleCreate = () => {
     const errs = validateForm(createForm);
     if (Object.keys(errs).length > 0) { setCreateErrors(errs); return; }
-    createMutation.mutate(createForm);
+    createMutation.mutate({ ...createForm, origin: window.location.origin });
   };
 
   const openEdit = (p: { id: number; name: string | null; email: string | null }) => {
@@ -284,6 +291,20 @@ export default function AdminPromoters() {
 
                       {/* Actions */}
                       <div className="flex items-center gap-1 shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          title="Resend invite email"
+                          disabled={resendInviteMutation.isPending}
+                          onClick={() => resendInviteMutation.mutate({ promoterId: p.id, origin: window.location.origin })}
+                        >
+                          {resendInviteMutation.isPending ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Send className="h-3.5 w-3.5" />
+                          )}
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon"

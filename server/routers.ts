@@ -32,12 +32,18 @@ import {
   updateParent,
   updatePromoter,
   updateStudent,
+  createInvite,
+  getInviteByToken,
+  markInviteUsed,
+  createCredentials,
+  getCredentialsByEmail,
 } from "./db";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { sendEmail } from "./_core/email";
+import { sdk } from "./_core/sdk";
 
 // ─── Role-based middleware ────────────────────────────────────────────────────
 
@@ -290,10 +296,100 @@ const adminRouter = router({
       z.object({
         name: z.string().min(1, "Name is required"),
         email: z.string().email("Valid email is required"),
+        origin: z.string().optional(), // frontend passes window.location.origin
       })
     )
-    .mutation(async ({ input }) => {
-      await createPromoter(input);
+    .mutation(async ({ input, ctx }) => {
+      await createPromoter({ name: input.name, email: input.email });
+      // Get the newly created user
+      const allPromoters = await getAllPromoters();
+      const newPromoter = allPromoters.find((p) => p.email === input.email);
+      if (!newPromoter) return { success: true };
+
+      // Generate invite token (expires in 7 days)
+      const { nanoid } = await import("nanoid");
+      const token = nanoid(48);
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      await createInvite(newPromoter.id, token, expiresAt);
+
+      // Build setup URL
+      const origin =
+        input.origin ||
+        (ctx.req.headers["x-forwarded-host"]
+          ? `https://${ctx.req.headers["x-forwarded-host"]}`
+          : `${ctx.req.protocol}://${ctx.req.headers.host}`);
+      const setupUrl = `${origin}/setup/${token}`;
+
+      // Send invitation email
+      try {
+        await sendEmail({
+          to: input.email,
+          subject: `You've been invited to join the Tutoring Referral Program`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
+              <div style="background: #1e40af; padding: 24px; border-radius: 8px 8px 0 0; text-align: center;">
+                <h1 style="color: #fff; margin: 0; font-size: 24px;">Welcome to the Referral Program!</h1>
+              </div>
+              <div style="background: #f9fafb; padding: 24px; border-radius: 0 0 8px 8px; border: 1px solid #e5e7eb;">
+                <p style="font-size: 16px;">Hi <strong>${input.name}</strong>,</p>
+                <p style="font-size: 16px;">You've been invited as a promoter for our tutoring referral program. Click the button below to set up your account and start earning $50 for every student you refer who enrolls.</p>
+                <div style="text-align: center; margin: 28px 0;">
+                  <a href="${setupUrl}" style="background: #1e40af; color: #fff; padding: 14px 28px; border-radius: 6px; text-decoration: none; font-size: 16px; font-weight: bold;">Set Up My Account</a>
+                </div>
+                <p style="font-size: 13px; color: #6b7280;">Or copy this link into your browser:<br/><a href="${setupUrl}" style="color: #1e40af; word-break: break-all;">${setupUrl}</a></p>
+                <p style="font-size: 13px; color: #6b7280;">This invitation link expires in <strong>7 days</strong>.</p>
+                <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;" />
+                <p style="font-size: 12px; color: #9ca3af; text-align: center;">Tutoring Referral Manager &mdash; Earn $50 for every student you refer who enrolls!</p>
+              </div>
+            </div>
+          `,
+        });
+      } catch (err) {
+        console.error("[Email] Failed to send invite email:", err);
+      }
+
+      return { success: true };
+    }),
+
+  resendInvite: adminProcedure
+    .input(z.object({ promoterId: z.number(), origin: z.string().optional() }))
+    .mutation(async ({ input, ctx }) => {
+      const promoter = await getUserById(input.promoterId);
+      if (!promoter || promoter.role !== "promoter") throw new TRPCError({ code: "NOT_FOUND" });
+      if (!promoter.email) throw new TRPCError({ code: "BAD_REQUEST", message: "Promoter has no email" });
+
+      const { nanoid } = await import("nanoid");
+      const token = nanoid(48);
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      await createInvite(promoter.id, token, expiresAt);
+
+      const origin =
+        input.origin ||
+        (ctx.req.headers["x-forwarded-host"]
+          ? `https://${ctx.req.headers["x-forwarded-host"]}`
+          : `${ctx.req.protocol}://${ctx.req.headers.host}`);
+      const setupUrl = `${origin}/setup/${token}`;
+
+      await sendEmail({
+        to: promoter.email,
+        subject: `Your account setup link for the Tutoring Referral Program`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
+            <div style="background: #1e40af; padding: 24px; border-radius: 8px 8px 0 0; text-align: center;">
+              <h1 style="color: #fff; margin: 0; font-size: 24px;">Account Setup Link</h1>
+            </div>
+            <div style="background: #f9fafb; padding: 24px; border-radius: 0 0 8px 8px; border: 1px solid #e5e7eb;">
+              <p style="font-size: 16px;">Hi <strong>${promoter.name || "Promoter"}</strong>,</p>
+              <p style="font-size: 16px;">Here is your new account setup link. Click the button below to set your password and access your promoter dashboard.</p>
+              <div style="text-align: center; margin: 28px 0;">
+                <a href="${setupUrl}" style="background: #1e40af; color: #fff; padding: 14px 28px; border-radius: 6px; text-decoration: none; font-size: 16px; font-weight: bold;">Set Up My Account</a>
+              </div>
+              <p style="font-size: 13px; color: #6b7280;">This link expires in <strong>7 days</strong>.</p>
+            </div>
+          </div>
+        `,
+      });
+
       return { success: true };
     }),
 
@@ -452,6 +548,85 @@ const promoterRouter = router({
   }),
 });
 
+// ─── Invite / Credentials Router ─────────────────────────────────────────────
+
+const inviteRouter = router({
+  // Public: resolve an invite token to see promoter name (for the setup page)
+  resolve: publicProcedure
+    .input(z.object({ token: z.string() }))
+    .query(async ({ input }) => {
+      const invite = await getInviteByToken(input.token);
+      if (!invite) throw new TRPCError({ code: "NOT_FOUND", message: "Invalid or expired invite link" });
+      if (invite.usedAt) throw new TRPCError({ code: "BAD_REQUEST", message: "This invite has already been used" });
+      if (new Date() > invite.expiresAt) throw new TRPCError({ code: "BAD_REQUEST", message: "This invite link has expired" });
+      const promoter = await getUserById(invite.userId);
+      if (!promoter) throw new TRPCError({ code: "NOT_FOUND" });
+      return { name: promoter.name ?? "", email: promoter.email ?? "" };
+    }),
+
+  // Public: set up account (choose email + password) via invite token
+  setupAccount: publicProcedure
+    .input(
+      z.object({
+        token: z.string(),
+        email: z.string().email("Valid email required"),
+        password: z.string().min(8, "Password must be at least 8 characters"),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const invite = await getInviteByToken(input.token);
+      if (!invite) throw new TRPCError({ code: "NOT_FOUND", message: "Invalid or expired invite link" });
+      if (invite.usedAt) throw new TRPCError({ code: "BAD_REQUEST", message: "This invite has already been used" });
+      if (new Date() > invite.expiresAt) throw new TRPCError({ code: "BAD_REQUEST", message: "This invite link has expired" });
+
+      // Check email not already taken
+      const existing = await getCredentialsByEmail(input.email);
+      if (existing) throw new TRPCError({ code: "CONFLICT", message: "This email is already in use" });
+
+      // Hash password and store credentials
+      const bcrypt = await import("bcryptjs");
+      const passwordHash = await bcrypt.hash(input.password, 12);
+      await createCredentials(invite.userId, input.email, passwordHash);
+      await markInviteUsed(invite.id);
+
+      // Auto-login: create a session cookie
+      const promoter = await getUserById(invite.userId);
+      if (!promoter) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const sessionToken = await sdk.createSessionToken(promoter.openId, { name: promoter.name ?? "" });
+      const cookieOptions = getSessionCookieOptions(ctx.req);
+      ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: 365 * 24 * 60 * 60 * 1000 });
+
+      return { success: true, name: promoter.name ?? "" };
+    }),
+
+  // Public: email/password login for promoters
+  login: publicProcedure
+    .input(
+      z.object({
+        email: z.string().email(),
+        password: z.string().min(1),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const creds = await getCredentialsByEmail(input.email);
+      if (!creds) throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid email or password" });
+
+      const bcrypt = await import("bcryptjs");
+      const valid = await bcrypt.compare(input.password, creds.passwordHash);
+      if (!valid) throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid email or password" });
+
+      const promoter = await getUserById(creds.userId);
+      if (!promoter) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const sessionToken = await sdk.createSessionToken(promoter.openId, { name: promoter.name ?? "" });
+      const cookieOptions = getSessionCookieOptions(ctx.req);
+      ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: 365 * 24 * 60 * 60 * 1000 });
+
+      return { success: true, role: promoter.role, name: promoter.name ?? "" };
+    }),
+});
+
 // ─── App Router ───────────────────────────────────────────────────────────────
 
 export const appRouter = router({
@@ -470,6 +645,7 @@ export const appRouter = router({
   admin: adminRouter,
   promoter: promoterRouter,
   referralLink: referralLinkRouter,
+  invite: inviteRouter,
 });
 
 export type AppRouter = typeof appRouter;

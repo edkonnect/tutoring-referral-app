@@ -24,6 +24,7 @@ import PromoterEarnings from "./pages/promoter/PromoterEarnings";
 
 // Public pages
 import ReferralRegister from "./pages/ReferralRegister";
+import AccountSetup from "./pages/AccountSetup";
 
 function Router() {
   return (
@@ -48,6 +49,9 @@ function Router() {
 
       {/* Public referral registration - no auth required */}
       <Route path="/refer/:token" component={ReferralRegister} />
+
+      {/* Account setup via invite link - no auth required */}
+      <Route path="/setup/:token" component={AccountSetup} />
 
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />

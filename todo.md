@@ -82,3 +82,29 @@
 - [x] Edit button on PromoterParents list cards navigates to edit page
 - [x] Route /promoter/parents/:id/edit registered in App.tsx
 - [x] Vitest tests for parent update and student management (8 tests, 44 total passing)
+
+## Full CRUD for Parents, Students, Promoters
+
+### Backend
+- [x] Admin: createPromoter procedure (invite user as promoter)
+- [x] Admin: updatePromoter procedure (name, email)
+- [x] Admin: deletePromoter procedure (with guard: no active referrals)
+- [x] Promoter: getParentById procedure (for detail view)
+- [x] Student: getById exposed as tRPC procedure
+
+### Admin Promoter Management UI
+- [x] Admin Promoters: Add Promoter button → create form (name, email)
+- [x] Admin Promoters: Edit promoter inline dialog (name, email)
+- [x] Admin Promoters: Delete promoter with AlertDialog confirmation
+
+### Promoter Parents CRUD UI
+- [x] Parents list: AlertDialog delete confirmation with student count badges
+- [x] Parents list: search filter + enrolled count badges
+
+### Promoter Students CRUD UI
+- [x] Students list: add student dialog (select parent, fill details)
+- [x] Students list: edit student dialog (pre-filled)
+- [x] Students list: AlertDialog delete confirmation
+
+### Tests
+- [x] Vitest tests for promoter CRUD (admin-only guards) — 13 tests, 57 total passing

@@ -63,6 +63,40 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
+export async function createPromoter(data: { name: string; email: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  // Insert a new user row with role=promoter and a placeholder openId
+  // The user will claim their account on first OAuth login via email match
+  const openId = `invite_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+  await db.insert(users).values({
+    openId,
+    name: data.name,
+    email: data.email,
+    role: "promoter",
+    lastSignedIn: new Date(),
+  });
+}
+
+export async function updatePromoter(id: number, data: { name?: string; email?: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(users).set(data).where(eq(users.id, id));
+}
+
+export async function deletePromoter(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(users).where(eq(users.id, id));
+}
+
+export async function getPromoterReferralCount(promoterId: number) {
+  const db = await getDb();
+  if (!db) return 0;
+  const rows = await db.select({ cnt: count() }).from(referrals).where(eq(referrals.promoterId, promoterId));
+  return Number(rows[0]?.cnt ?? 0);
+}
+
 export async function getAllPromoters() {
   const db = await getDb();
   if (!db) return [];

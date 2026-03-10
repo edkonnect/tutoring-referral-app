@@ -1,259 +1,248 @@
 import DashboardLayout from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
-import { Plus, Pencil, Trash2, Mail, Phone, Users } from "lucide-react";
-import { useState } from "react";
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  Mail,
+  Phone,
+  Users,
+  GraduationCap,
+  Search,
+  FileText,
+} from "lucide-react";
+import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
-
-type ParentForm = {
-  name: string;
-  email: string;
-  phone: string;
-  notes: string;
-};
-
-const emptyForm: ParentForm = { name: "", email: "", phone: "", notes: "" };
 
 export default function PromoterParents() {
   const utils = trpc.useUtils();
   const [, navigate] = useLocation();
-  const { data: parents, isLoading } = trpc.parents.list.useQuery();
 
-  const [showDialog, setShowDialog] = useState(false);
-  const [editId, setEditId] = useState<number | null>(null);
-  const [form, setForm] = useState<ParentForm>(emptyForm);
+  const { data: parents = [], isLoading } = trpc.parents.list.useQuery();
+  const { data: allStudents = [] } = trpc.students.listByPromoter.useQuery();
+
+  const [search, setSearch] = useState("");
   const [deleteId, setDeleteId] = useState<number | null>(null);
 
-  const createMutation = trpc.parents.create.useMutation({
-    onSuccess: () => {
-      utils.parents.list.invalidate();
-      utils.promoter.getStats.invalidate();
-      toast.success("Parent added successfully");
-      setShowDialog(false);
-      setForm(emptyForm);
-    },
-    onError: (e) => toast.error(e.message),
-  });
+  const deleteTarget = parents.find((p) => p.id === deleteId);
 
-  const updateMutation = trpc.parents.update.useMutation({
-    onSuccess: () => {
-      utils.parents.list.invalidate();
-      toast.success("Parent updated");
-      setShowDialog(false);
-      setEditId(null);
-    },
-    onError: (e) => toast.error(e.message),
-  });
+  const studentCountMap = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const s of allStudents) {
+      map.set(s.parentId, (map.get(s.parentId) ?? 0) + 1);
+    }
+    return map;
+  }, [allStudents]);
+
+  const enrolledCountMap = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const s of allStudents) {
+      if (s.enrolled) map.set(s.parentId, (map.get(s.parentId) ?? 0) + 1);
+    }
+    return map;
+  }, [allStudents]);
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    return parents.filter(
+      (p) =>
+        p.name.toLowerCase().includes(q) ||
+        p.email.toLowerCase().includes(q) ||
+        (p.phone ?? "").toLowerCase().includes(q)
+    );
+  }, [parents, search]);
 
   const deleteMutation = trpc.parents.delete.useMutation({
     onSuccess: () => {
       utils.parents.list.invalidate();
       utils.promoter.getStats.invalidate();
-      toast.success("Parent removed");
+      utils.students.listByPromoter.invalidate();
+      toast.success("Parent removed successfully.");
       setDeleteId(null);
     },
-    onError: (e) => toast.error(e.message),
+    onError: (e) => {
+      toast.error(e.message);
+      setDeleteId(null);
+    },
   });
-
-  const openAdd = () => {
-    setEditId(null);
-    setForm(emptyForm);
-    setShowDialog(true);
-  };
-
-  const openEdit = (p: NonNullable<typeof parents>[0]) => {
-    setEditId(p.id);
-    setForm({ name: p.name, email: p.email, phone: p.phone ?? "", notes: p.notes ?? "" });
-    setShowDialog(true);
-  };
-
-  const handleSubmit = () => {
-    if (!form.name.trim() || !form.email.trim()) {
-      toast.error("Name and email are required");
-      return;
-    }
-    if (editId) {
-      updateMutation.mutate({ id: editId, ...form });
-    } else {
-      createMutation.mutate(form);
-    }
-  };
-
-  const isPending = createMutation.isPending || updateMutation.isPending;
 
   return (
     <DashboardLayout>
-      <div className="max-w-5xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold text-foreground">My Parents</h1>
-            <p className="text-muted-foreground mt-1">Manage your referred parents</p>
+            <p className="text-muted-foreground text-sm mt-0.5">
+              Manage your referred parents and their students.
+            </p>
           </div>
-          <Button onClick={() => navigate("/promoter/parents/new")} className="gap-2">
+          <Button onClick={() => navigate("/promoter/parents/new")} className="gap-2 shrink-0">
             <Plus className="h-4 w-4" />
             Add Parent
           </Button>
         </div>
 
+        {/* Search */}
+        <div className="relative max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            className="pl-9"
+            placeholder="Search by name, email, or phone…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+
+        {/* List */}
         {isLoading ? (
-          <div className="grid gap-3">
+          <div className="space-y-3">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-20 bg-muted animate-pulse rounded-lg" />
+              <div key={i} className="h-24 bg-muted animate-pulse rounded-xl" />
             ))}
           </div>
-        ) : !parents?.length ? (
-          <Card className="border-dashed">
-            <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-              <Users className="h-10 w-10 text-muted-foreground mb-3" />
-              <p className="font-medium text-foreground">No parents yet</p>
-              <p className="text-sm text-muted-foreground mt-1 mb-4">
-                Add your first referred parent to get started.
-              </p>
-              <Button onClick={() => navigate("/promoter/parents/new")} variant="outline" className="gap-2">
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="h-14 w-14 rounded-full bg-muted flex items-center justify-center mb-4">
+              <Users className="h-6 w-6 text-muted-foreground" />
+            </div>
+            <p className="font-medium text-foreground mb-1">
+              {search ? "No parents match your search" : "No parents yet"}
+            </p>
+            <p className="text-sm text-muted-foreground mb-4">
+              {search
+                ? "Try a different name, email, or phone."
+                : "Add your first referred parent to get started."}
+            </p>
+            {!search && (
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={() => navigate("/promoter/parents/new")}
+              >
                 <Plus className="h-4 w-4" />
                 Add Parent
               </Button>
-            </CardContent>
-          </Card>
+            )}
+          </div>
         ) : (
           <div className="grid gap-3">
-            {parents.map((p) => (
-              <Card key={p.id} className="border shadow-sm">
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-foreground">{p.name}</p>
-                      <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
-                        <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                          <Mail className="h-3.5 w-3.5" />
-                          {p.email}
-                        </span>
-                        {p.phone && (
-                          <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                            <Phone className="h-3.5 w-3.5" />
-                            {p.phone}
-                          </span>
-                        )}
+            {filtered.map((p) => {
+              const studentCount = studentCountMap.get(p.id) ?? 0;
+              const enrolledCount = enrolledCountMap.get(p.id) ?? 0;
+              return (
+                <Card key={p.id} className="border shadow-sm hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      {/* Info */}
+                      <div className="flex items-start gap-3 flex-1 min-w-0">
+                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                          <Users className="h-5 w-5 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-semibold text-foreground">{p.name}</p>
+                            {enrolledCount > 0 && (
+                              <Badge className="text-xs bg-emerald-100 text-emerald-700 border-emerald-200">
+                                {enrolledCount} enrolled
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
+                            <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                              <Mail className="h-3.5 w-3.5" />
+                              {p.email}
+                            </span>
+                            {p.phone && (
+                              <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                                <Phone className="h-3.5 w-3.5" />
+                                {p.phone}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 mt-2 flex-wrap">
+                            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <GraduationCap className="h-3 w-3" />
+                              {studentCount} student{studentCount !== 1 ? "s" : ""}
+                            </span>
+                            {p.notes && (
+                              <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <FileText className="h-3 w-3" />
+                                <span className="truncate max-w-[200px]">{p.notes}</span>
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                      {p.notes && (
-                        <p className="text-xs text-muted-foreground mt-1.5 line-clamp-1">{p.notes}</p>
-                      )}
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          title="Edit parent"
+                          onClick={() => navigate(`/promoter/parents/${p.id}/edit`)}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          title="Delete parent"
+                          onClick={() => setDeleteId(p.id)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        title="Edit parent"
-                        onClick={() => navigate(`/promoter/parents/${p.id}/edit`)}
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive"
-                        onClick={() => setDeleteId(p.id)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>
 
-      {/* Add/Edit Dialog */}
-      <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editId ? "Edit Parent" : "Add Parent"}</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-2">
-            <div className="grid gap-1.5">
-              <Label>Full Name *</Label>
-              <Input
-                placeholder="Jane Smith"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-              />
-            </div>
-            <div className="grid gap-1.5">
-              <Label>Email Address *</Label>
-              <Input
-                type="email"
-                placeholder="jane@example.com"
-                value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
-              />
-            </div>
-            <div className="grid gap-1.5">
-              <Label>Phone Number</Label>
-              <Input
-                placeholder="+1 (555) 000-0000"
-                value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
-              />
-            </div>
-            <div className="grid gap-1.5">
-              <Label>Notes</Label>
-              <Textarea
-                placeholder="Any additional notes..."
-                value={form.notes}
-                onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                rows={2}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSubmit} disabled={isPending}>
-              {isPending ? "Saving..." : editId ? "Save Changes" : "Add Parent"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Confirm Dialog */}
-      <Dialog open={deleteId !== null} onOpenChange={() => setDeleteId(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Remove Parent</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Are you sure you want to remove this parent? This action cannot be undone.
-          </p>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteId(null)}>
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => deleteId && deleteMutation.mutate({ id: deleteId })}
+      {/* Delete Confirmation */}
+      <AlertDialog open={deleteId !== null} onOpenChange={(open) => !open && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Parent</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove{" "}
+              <strong>{deleteTarget?.name ?? "this parent"}</strong> and all their associated
+              students? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteId !== null && deleteMutation.mutate({ id: deleteId })}
               disabled={deleteMutation.isPending}
             >
-              {deleteMutation.isPending ? "Removing..." : "Remove"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              {deleteMutation.isPending ? "Removing…" : "Remove"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardLayout>
   );
 }

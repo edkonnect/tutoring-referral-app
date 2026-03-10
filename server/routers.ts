@@ -2,9 +2,11 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
   createParent,
+  createPromoter,
   createReferral,
   createStudent,
   deleteParent,
+  deletePromoter,
   deleteStudent,
   enrollStudent,
   getAllParents,
@@ -14,6 +16,7 @@ import {
   getParentById,
   getParentsByPromoter,
   getPromoterEarningsSummary,
+  getPromoterReferralCount,
   getReferralByStudentId,
   getReferralsByPromoter,
   getStudentById,
@@ -27,6 +30,7 @@ import {
   markReferralPaid,
   setReferralToken,
   updateParent,
+  updatePromoter,
   updateStudent,
 } from "./db";
 import { COOKIE_NAME } from "@shared/const";
@@ -280,6 +284,54 @@ const referralsRouter = router({
 
 const adminRouter = router({
   listPromoters: adminProcedure.query(() => getAllPromoters()),
+
+  createPromoter: adminProcedure
+    .input(
+      z.object({
+        name: z.string().min(1, "Name is required"),
+        email: z.string().email("Valid email is required"),
+      })
+    )
+    .mutation(async ({ input }) => {
+      await createPromoter(input);
+      return { success: true };
+    }),
+
+  updatePromoter: adminProcedure
+    .input(
+      z.object({
+        id: z.number(),
+        name: z.string().min(1).optional(),
+        email: z.string().email().optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const { id, ...data } = input;
+      await updatePromoter(id, data);
+      return { success: true };
+    }),
+
+  deletePromoter: adminProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      const referralCount = await getPromoterReferralCount(input.id);
+      if (referralCount > 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Cannot delete promoter with ${referralCount} active referral(s). Remove their referrals first.`,
+        });
+      }
+      await deletePromoter(input.id);
+      return { success: true };
+    }),
+
+  getPromoterById: adminProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ input }) => {
+      const promoter = await getUserById(input.id);
+      if (!promoter || promoter.role !== "promoter") throw new TRPCError({ code: "NOT_FOUND" });
+      return promoter;
+    }),
 
   getStats: adminProcedure.query(async () => {
     const [allPromoters, allParents, allStudents, allReferrals] = await Promise.all([

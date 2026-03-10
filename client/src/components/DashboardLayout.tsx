@@ -33,6 +33,8 @@ import {
   UserCheck,
   ClipboardList,
   CreditCard,
+  Package,
+  Send,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -46,6 +48,8 @@ const adminMenuItems = [
   { icon: GraduationCap, label: "Students", path: "/admin/students" },
   { icon: UserCheck, label: "Enrollments", path: "/admin/enrollments" },
   { icon: CreditCard, label: "Payouts", path: "/admin/payouts" },
+  { icon: Package, label: "Products", path: "/admin/products" },
+  { icon: Send, label: "Product Promotions", path: "/admin/product-promotions" },
 ];
 
 const promoterMenuItems = [
@@ -53,6 +57,8 @@ const promoterMenuItems = [
   { icon: BookOpen, label: "My Parents", path: "/promoter/parents" },
   { icon: GraduationCap, label: "My Students", path: "/promoter/students" },
   { icon: DollarSign, label: "Earnings", path: "/promoter/earnings" },
+  { icon: Package, label: "Products", path: "/promoter/products" },
+  { icon: Send, label: "My Promotions", path: "/promoter/my-promotions" },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";

@@ -122,3 +122,34 @@
 - [x] Landing page: email/password login form for promoters
 - [x] Landing page: show both Manus OAuth and email/password login options
 - [x] Vitest tests for invite flow, setup, and login (12 tests, 69 total passing)
+
+## Product Promotion System
+### Database
+- [x] products table (id, name, description, price, category, active, createdAt)
+- [x] product_promotions table (id, promoter_id, parent_id, product_id, sent_at, message)
+- [x] product_enrollments table (id, promotion_id, enrolled_at, credit_amount=$25, status=pending|paid)
+
+### Backend API
+- [x] Admin: CRUD for products (create, update, delete, list)
+- [x] Promoter: list available products
+- [x] Promoter: send product promotion to a parent (with optional message)
+- [x] Promoter: list own sent promotions and their enrollment status
+- [x] Admin: list all product promotions
+- [x] Admin: confirm product enrollment (triggers $25 credit + email to promoter)
+- [x] Admin: mark product promotion credit as paid
+- [x] Email notification to promoter when product enrollment confirmed
+
+### Promoter UI
+- [x] Products page: browse available products with details
+- [x] Send Promotion dialog: select parent + optional message
+- [x] My Promotions page: list sent promotions with status (pending/enrolled/paid)
+- [x] Earnings page: product promotion credits shown on My Promotions page
+
+### Admin UI
+- [x] Products management page (CRUD)
+- [x] Product Promotions page: view all sent promotions
+- [x] Product Enrollments page: confirm enrollment, trigger $25 credit (inline on promotions page)
+- [x] Payouts page: product promotion credits managed via Product Promotions page
+
+### Tests
+- [x] Vitest tests for product promotion flow (12 tests, 81 total passing)

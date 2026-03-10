@@ -13,6 +13,8 @@ import AdminParents from "./pages/admin/AdminParents";
 import AdminStudents from "./pages/admin/AdminStudents";
 import AdminEnrollments from "./pages/admin/AdminEnrollments";
 import AdminPayouts from "./pages/admin/AdminPayouts";
+import AdminProducts from "./pages/admin/AdminProducts";
+import AdminProductPromotions from "./pages/admin/AdminProductPromotions";
 
 // Promoter pages
 import PromoterDashboard from "./pages/promoter/PromoterDashboard";
@@ -21,6 +23,8 @@ import AddParent from "./pages/promoter/AddParent";
 import EditParent from "./pages/promoter/EditParent";
 import PromoterStudents from "./pages/promoter/PromoterStudents";
 import PromoterEarnings from "./pages/promoter/PromoterEarnings";
+import PromoterProducts from "./pages/promoter/PromoterProducts";
+import PromoterMyPromotions from "./pages/promoter/PromoterMyPromotions";
 
 // Public pages
 import ReferralRegister from "./pages/ReferralRegister";
@@ -38,6 +42,8 @@ function Router() {
       <Route path="/admin/students" component={AdminStudents} />
       <Route path="/admin/enrollments" component={AdminEnrollments} />
       <Route path="/admin/payouts" component={AdminPayouts} />
+      <Route path="/admin/products" component={AdminProducts} />
+      <Route path="/admin/product-promotions" component={AdminProductPromotions} />
 
       {/* Promoter routes */}
       <Route path="/promoter" component={PromoterDashboard} />
@@ -46,6 +52,8 @@ function Router() {
       <Route path="/promoter/parents" component={PromoterParents} />
       <Route path="/promoter/students" component={PromoterStudents} />
       <Route path="/promoter/earnings" component={PromoterEarnings} />
+      <Route path="/promoter/products" component={PromoterProducts} />
+      <Route path="/promoter/my-promotions" component={PromoterMyPromotions} />
 
       {/* Public referral registration - no auth required */}
       <Route path="/refer/:token" component={ReferralRegister} />

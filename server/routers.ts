@@ -37,6 +37,21 @@ import {
   markInviteUsed,
   createCredentials,
   getCredentialsByEmail,
+  getAllProducts,
+  getProductById,
+  createProduct,
+  updateProduct,
+  deleteProduct,
+  sendProductPromotion,
+  getProductPromotionsByPromoter,
+  getAllProductPromotions,
+  getProductPromotionById,
+  confirmProductEnrollment,
+  getProductEnrollmentsByPromoter,
+  getAllProductEnrollments,
+  getProductEnrollmentByPromotionId,
+  markProductEnrollmentPaid,
+  getPromoterProductEarningsSummary,
 } from "./db";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
@@ -629,6 +644,201 @@ const inviteRouter = router({
 
 // ─── App Router ───────────────────────────────────────────────────────────────
 
+// ─── Products Router (admin manages, promoters browse) ────────────────────────────
+
+const productsRouter = router({
+  list: promoterProcedure.query(async ({ ctx }) => {
+    // Admins see all products; promoters see only active ones
+    return getAllProducts(ctx.user.role !== "admin");
+  }),
+
+  listAll: adminProcedure.query(() => getAllProducts(false)),
+
+  getById: promoterProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ input }) => {
+      const product = await getProductById(input.id);
+      if (!product) throw new TRPCError({ code: "NOT_FOUND", message: "Product not found" });
+      return product;
+    }),
+
+  create: adminProcedure
+    .input(
+      z.object({
+        name: z.string().min(1, "Name is required"),
+        description: z.string().optional(),
+        price: z.string().optional(),
+        category: z.string().optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      await createProduct(input);
+      return { success: true };
+    }),
+
+  update: adminProcedure
+    .input(
+      z.object({
+        id: z.number(),
+        name: z.string().min(1).optional(),
+        description: z.string().optional(),
+        price: z.string().optional(),
+        category: z.string().optional(),
+        active: z.boolean().optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const { id, ...data } = input;
+      await updateProduct(id, data);
+      return { success: true };
+    }),
+
+  delete: adminProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      await deleteProduct(input.id);
+      return { success: true };
+    }),
+});
+
+// ─── Product Promotions Router ─────────────────────────────────────────────────────
+
+const productPromotionsRouter = router({
+  // Promoter sends a product promotion to a parent
+  send: promoterProcedure
+    .input(
+      z.object({
+        parentId: z.number(),
+        productId: z.number(),
+        message: z.string().optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const promoterId = ctx.user.id;
+
+      // Verify the parent belongs to this promoter (or admin)
+      const parent = await getParentById(input.parentId);
+      if (!parent) throw new TRPCError({ code: "NOT_FOUND", message: "Parent not found" });
+      if (ctx.user.role !== "admin" && parent.promoterId !== promoterId) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Parent does not belong to you" });
+      }
+
+      // Verify product exists and is active
+      const product = await getProductById(input.productId);
+      if (!product || !product.active) throw new TRPCError({ code: "NOT_FOUND", message: "Product not found or inactive" });
+
+      await sendProductPromotion({ promoterId, parentId: input.parentId, productId: input.productId, message: input.message });
+      return { success: true };
+    }),
+
+  // Promoter views their own sent promotions
+  myList: promoterProcedure.query(async ({ ctx }) => {
+    const promotions = await getProductPromotionsByPromoter(ctx.user.id);
+    // Enrich with product and parent info
+    const enriched = await Promise.all(
+      promotions.map(async (promo) => {
+        const [product, parent, enrollment] = await Promise.all([
+          getProductById(promo.productId),
+          getParentById(promo.parentId),
+          getProductEnrollmentByPromotionId(promo.id),
+        ]);
+        return { ...promo, product, parent, enrollment };
+      })
+    );
+    return enriched;
+  }),
+
+  // Admin views all sent promotions
+  listAll: adminProcedure.query(async () => {
+    const promotions = await getAllProductPromotions();
+    const enriched = await Promise.all(
+      promotions.map(async (promo) => {
+        const [product, parent, promoter, enrollment] = await Promise.all([
+          getProductById(promo.productId),
+          getParentById(promo.parentId),
+          getUserById(promo.promoterId),
+          getProductEnrollmentByPromotionId(promo.id),
+        ]);
+        return { ...promo, product, parent, promoter, enrollment };
+      })
+    );
+    return enriched;
+  }),
+
+  // Admin confirms a parent enrolled in a promoted product → $25 credit
+  confirmEnrollment: adminProcedure
+    .input(z.object({ promotionId: z.number() }))
+    .mutation(async ({ input }) => {
+      const promotion = await getProductPromotionById(input.promotionId);
+      if (!promotion) throw new TRPCError({ code: "NOT_FOUND", message: "Promotion not found" });
+
+      // Check not already enrolled
+      const existing = await getProductEnrollmentByPromotionId(input.promotionId);
+      if (existing) throw new TRPCError({ code: "CONFLICT", message: "Already enrolled for this promotion" });
+
+      // Create the $25 credit record
+      await confirmProductEnrollment({
+        promotionId: promotion.id,
+        promoterId: promotion.promoterId,
+        parentId: promotion.parentId,
+        productId: promotion.productId,
+      });
+
+      // Notify the promoter via email
+      const [promoter, product, parent] = await Promise.all([
+        getUserById(promotion.promoterId),
+        getProductById(promotion.productId),
+        getParentById(promotion.parentId),
+      ]);
+
+      if (promoter?.email && product && parent) {
+        await sendEmail({
+          to: promoter.email,
+          subject: `🎉 Product Enrollment Confirmed — $25 Credit Earned!`,
+          html: `
+            <div style="font-family:sans-serif;max-width:600px;margin:0 auto;">
+              <h2 style="color:#2563eb;">Great news, ${promoter.name || "Promoter"}!</h2>
+              <p>Your referred parent <strong>${parent.name}</strong> has enrolled in <strong>${product.name}</strong>.</p>
+              <p>A <strong>$25.00 referral credit</strong> has been added to your account.</p>
+              <p style="color:#6b7280;font-size:0.875rem;">Log in to your dashboard to view your earnings and payout status.</p>
+            </div>
+          `,
+        });
+      }
+
+      return { success: true };
+    }),
+
+  // Admin marks a product enrollment credit as paid
+  markPaid: adminProcedure
+    .input(z.object({ enrollmentId: z.number() }))
+    .mutation(async ({ input }) => {
+      await markProductEnrollmentPaid(input.enrollmentId);
+      return { success: true };
+    }),
+
+  // Admin lists all product enrollment credits (for payout management)
+  listEnrollments: adminProcedure.query(() => getAllProductEnrollments()),
+
+  // Promoter views their own product enrollment credits
+  myEarnings: promoterProcedure.query(async ({ ctx }) => {
+    const [enrollments, summary] = await Promise.all([
+      getProductEnrollmentsByPromoter(ctx.user.id),
+      getPromoterProductEarningsSummary(ctx.user.id),
+    ]);
+    const enriched = await Promise.all(
+      enrollments.map(async (e) => {
+        const [product, parent] = await Promise.all([
+          getProductById(e.productId),
+          getParentById(e.parentId),
+        ]);
+        return { ...e, product, parent };
+      })
+    );
+    return { enrollments: enriched, summary };
+  }),
+});
+
 export const appRouter = router({
   system: systemRouter,
   auth: router({
@@ -646,6 +856,8 @@ export const appRouter = router({
   promoter: promoterRouter,
   referralLink: referralLinkRouter,
   invite: inviteRouter,
+  products: productsRouter,
+  productPromotions: productPromotionsRouter,
 });
 
 export type AppRouter = typeof appRouter;

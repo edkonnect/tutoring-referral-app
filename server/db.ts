@@ -1,6 +1,6 @@
 import { and, count, desc, eq, gte, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, parents, promoterCredentials, promoterInvites, referralLinkVisits, referrals, students, users } from "../drizzle/schema";
+import { InsertUser, parents, productEnrollments, productPromotions, products, promoterCredentials, promoterInvites, referralLinkVisits, referrals, students, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -407,6 +407,154 @@ export async function getCredentialsByEmail(email: string) {
   if (!db) return undefined;
   const result = await db.select().from(promoterCredentials).where(eq(promoterCredentials.email, email)).limit(1);
   return result.length > 0 ? result[0] : undefined;
+}
+
+// ─── Products ────────────────────────────────────────────────────────────────
+
+export async function getAllProducts(activeOnly = false) {
+  const db = await getDb();
+  if (!db) return [];
+  if (activeOnly) {
+    return db.select().from(products).where(eq(products.active, true)).orderBy(desc(products.createdAt));
+  }
+  return db.select().from(products).orderBy(desc(products.createdAt));
+}
+
+export async function getProductById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(products).where(eq(products.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function createProduct(data: {
+  name: string;
+  description?: string;
+  price?: string;
+  category?: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(products).values({ ...data, active: true });
+  return result;
+}
+
+export async function updateProduct(
+  id: number,
+  data: { name?: string; description?: string; price?: string; category?: string; active?: boolean }
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(products).set(data).where(eq(products.id, id));
+}
+
+export async function deleteProduct(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(products).where(eq(products.id, id));
+}
+
+// ─── Product Promotions ───────────────────────────────────────────────────────
+
+export async function sendProductPromotion(data: {
+  promoterId: number;
+  parentId: number;
+  productId: number;
+  message?: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(productPromotions).values(data);
+  return result;
+}
+
+export async function getProductPromotionsByPromoter(promoterId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(productPromotions)
+    .where(eq(productPromotions.promoterId, promoterId))
+    .orderBy(desc(productPromotions.sentAt));
+}
+
+export async function getAllProductPromotions() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(productPromotions).orderBy(desc(productPromotions.sentAt));
+}
+
+export async function getProductPromotionById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(productPromotions).where(eq(productPromotions.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+// ─── Product Enrollments ─────────────────────────────────────────────────────
+
+export async function confirmProductEnrollment(data: {
+  promotionId: number;
+  promoterId: number;
+  parentId: number;
+  productId: number;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.insert(productEnrollments).values({ ...data, creditAmount: "25.00", status: "pending" });
+}
+
+export async function getProductEnrollmentsByPromoter(promoterId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(productEnrollments)
+    .where(eq(productEnrollments.promoterId, promoterId))
+    .orderBy(desc(productEnrollments.enrolledAt));
+}
+
+export async function getAllProductEnrollments() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(productEnrollments).orderBy(desc(productEnrollments.enrolledAt));
+}
+
+export async function getProductEnrollmentByPromotionId(promotionId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db
+    .select()
+    .from(productEnrollments)
+    .where(eq(productEnrollments.promotionId, promotionId))
+    .limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function markProductEnrollmentPaid(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db
+    .update(productEnrollments)
+    .set({ status: "paid", paidAt: new Date() })
+    .where(eq(productEnrollments.id, id));
+}
+
+export async function getPromoterProductEarningsSummary(promoterId: number) {
+  const db = await getDb();
+  if (!db) return { total: 0, pending: 0, paid: 0, count: 0 };
+  const all = await db
+    .select()
+    .from(productEnrollments)
+    .where(eq(productEnrollments.promoterId, promoterId));
+  const pending = all.filter((e) => e.status === "pending").length;
+  const paid = all.filter((e) => e.status === "paid").length;
+  return {
+    total: all.length * 25,
+    pending: pending * 25,
+    paid: paid * 25,
+    count: all.length,
+  };
 }
 
 export async function getStudentsByPromoter(promoterId: number) {

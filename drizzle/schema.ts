@@ -111,3 +111,50 @@ export const promoterCredentials = mysqlTable("promoter_credentials", {
 
 export type PromoterCredential = typeof promoterCredentials.$inferSelect;
 export type InsertPromoterCredential = typeof promoterCredentials.$inferInsert;
+
+// Products that promoters can promote to parents
+export const products = mysqlTable("products", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  price: decimal("price", { precision: 10, scale: 2 }),
+  category: varchar("category", { length: 100 }),
+  active: boolean("active").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Product = typeof products.$inferSelect;
+export type InsertProduct = typeof products.$inferInsert;
+
+// Records of a promoter sending a product promotion to a parent
+export const productPromotions = mysqlTable("product_promotions", {
+  id: int("id").autoincrement().primaryKey(),
+  promoterId: int("promoterId").notNull(),   // references users.id
+  parentId: int("parentId").notNull(),       // references parents.id
+  productId: int("productId").notNull(),     // references products.id
+  message: text("message"),                  // optional personal message
+  sentAt: timestamp("sentAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ProductPromotion = typeof productPromotions.$inferSelect;
+export type InsertProductPromotion = typeof productPromotions.$inferInsert;
+
+// When a parent enrolls in a promoted product — triggers $25 credit
+export const productEnrollments = mysqlTable("product_enrollments", {
+  id: int("id").autoincrement().primaryKey(),
+  promotionId: int("promotionId").notNull(), // references product_promotions.id
+  promoterId: int("promoterId").notNull(),   // denormalized for easy querying
+  parentId: int("parentId").notNull(),
+  productId: int("productId").notNull(),
+  creditAmount: decimal("creditAmount", { precision: 10, scale: 2 }).default("25.00").notNull(),
+  status: mysqlEnum("status", ["pending", "paid"]).default("pending").notNull(),
+  enrolledAt: timestamp("enrolledAt").defaultNow().notNull(),
+  paidAt: timestamp("paidAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type ProductEnrollment = typeof productEnrollments.$inferSelect;
+export type InsertProductEnrollment = typeof productEnrollments.$inferInsert;

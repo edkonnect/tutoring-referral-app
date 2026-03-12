@@ -32,6 +32,7 @@ vi.mock("./_core/email", () => ({
 }));
 
 import * as db from "./db";
+import * as emailModule from "./_core/email";
 
 function makeAdminCtx(): TrpcContext {
   return {
@@ -106,6 +107,37 @@ describe("productPromotions router", () => {
 
     const caller = appRouter.createCaller(makePromoterCtx(2));
     await expect(caller.productPromotions.send({ parentId: 10, productId: 5 })).rejects.toThrow("Parent does not belong to you");
+  });
+
+  it("sends email to parent with product details when promotion is sent", async () => {
+    vi.mocked(db.getParentById).mockResolvedValue({ id: 10, promoterId: 2, name: "Jane Doe", email: "jane@parent.com", phone: null, notes: null, createdAt: new Date() } as any);
+    vi.mocked(db.getProductById).mockResolvedValue({ id: 5, name: "Advanced Math", active: true, description: "Expert-led math tutoring", price: "150.00", category: "Mathematics", createdAt: new Date() } as any);
+    vi.mocked(db.sendProductPromotion).mockResolvedValue({} as any);
+
+    const caller = appRouter.createCaller(makePromoterCtx(2));
+    await caller.productPromotions.send({ parentId: 10, productId: 5, message: "Great for your child!" });
+
+    expect(emailModule.sendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: "jane@parent.com",
+        subject: expect.stringContaining("Advanced Math"),
+        html: expect.stringContaining("Advanced Math"),
+        text: expect.stringContaining("Advanced Math"),
+      })
+    );
+  });
+
+  it("does not send email when parent has no email address", async () => {
+    vi.mocked(db.getParentById).mockResolvedValue({ id: 10, promoterId: 2, name: "No Email Parent", email: null, phone: null, notes: null, createdAt: new Date() } as any);
+    vi.mocked(db.getProductById).mockResolvedValue({ id: 5, name: "Math Tutoring", active: true, description: null, price: null, category: null, createdAt: new Date() } as any);
+    vi.mocked(db.sendProductPromotion).mockResolvedValue({} as any);
+
+    vi.mocked(emailModule.sendEmail).mockClear();
+    const caller = appRouter.createCaller(makePromoterCtx(2));
+    const result = await caller.productPromotions.send({ parentId: 10, productId: 5 });
+
+    expect(result.success).toBe(true);
+    expect(emailModule.sendEmail).not.toHaveBeenCalled();
   });
 
   it("promoter cannot send promotion for inactive product", async () => {

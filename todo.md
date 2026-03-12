@@ -153,3 +153,9 @@
 
 ### Tests
 - [x] Vitest tests for product promotion flow (12 tests, 81 total passing)
+
+## Parent Email Notification on Product Promotion
+- [x] Backend: send email to parent when promoter sends a product promotion
+- [x] Email includes product name, description, price, category, and promoter name
+- [x] Email includes a call-to-action message from the promoter (if provided)
+- [x] Vitest tests for parent email notification on promotion send (2 tests, 83 total passing)

@@ -1,0 +1,9 @@
+{
+  "query": "ALTER TABLE `product_promotions` ADD `enrollmentToken` varchar(64);\nALTER TABLE `product_promotions` ADD CONSTRAINT `product_promotions_enrollmentToken_unique` UNIQUE(`enrollmentToken`);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3WQULgVDBb1t2sq.a48dca79cd35 --database MTFTFa6mJvR7VEHb68qsYm --execute ALTER TABLE `product_promotions` ADD `enrollmentToken` varchar(64);\nALTER TABLE `product_promotions` ADD CONSTRAINT `product_promotions_enrollmentToken_unique` UNIQUE(`enrollmentToken`);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 1393
+}

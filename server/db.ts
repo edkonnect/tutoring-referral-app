@@ -461,11 +461,23 @@ export async function sendProductPromotion(data: {
   parentId: number;
   productId: number;
   message?: string;
+  enrollmentToken?: string;
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   const result = await db.insert(productPromotions).values(data);
   return result;
+}
+
+export async function getPromotionByEnrollmentToken(token: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db
+    .select()
+    .from(productPromotions)
+    .where(eq(productPromotions.enrollmentToken, token))
+    .limit(1);
+  return result.length > 0 ? result[0] : undefined;
 }
 
 export async function getProductPromotionsByPromoter(promoterId: number) {

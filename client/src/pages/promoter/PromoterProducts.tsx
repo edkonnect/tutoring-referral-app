@@ -48,6 +48,7 @@ export default function PromoterProducts() {
       productId: sendDialog.productId,
       parentId: Number(selectedParentId),
       message: message.trim() || undefined,
+      origin: window.location.origin,
     });
   }
 

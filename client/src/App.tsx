@@ -30,6 +30,7 @@ import PromoterMyPromotions from "./pages/promoter/PromoterMyPromotions";
 // Public pages
 import ReferralRegister from "./pages/ReferralRegister";
 import AccountSetup from "./pages/AccountSetup";
+import EnrollmentLanding from "./pages/EnrollmentLanding";
 
 function Router() {
   return (
@@ -59,6 +60,9 @@ function Router() {
 
       {/* Public referral registration - no auth required */}
       <Route path="/refer/:token" component={ReferralRegister} />
+
+      {/* Public product enrollment via email link - no auth required */}
+      <Route path="/enroll/:token" component={EnrollmentLanding} />
 
       {/* Account setup via invite link - no auth required */}
       <Route path="/setup/:token" component={AccountSetup} />

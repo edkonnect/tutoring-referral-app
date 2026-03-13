@@ -1,0 +1,2 @@
+ALTER TABLE `product_promotions` ADD `enrollmentToken` varchar(64);--> statement-breakpoint
+ALTER TABLE `product_promotions` ADD CONSTRAINT `product_promotions_enrollmentToken_unique` UNIQUE(`enrollmentToken`);

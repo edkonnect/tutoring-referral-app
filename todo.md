@@ -227,3 +227,14 @@
 
 ### Tests
 - [x] Vitest tests for template CRUD and association (25 new tests, 123 total passing)
+
+## Parent Enrollment Link in Promotion Email
+- [x] DB: add enrollmentToken column to product_promotions table (unique, nanoid)
+- [x] Backend: generate enrollmentToken when sending a product promotion
+- [x] Backend: public resolveEnrollmentToken procedure (returns promotion + parent + product info)
+- [x] Backend: public selfEnroll procedure (parent submits name/email → marks enrolled + notifies promoter)
+- [x] Email: inject {{registrationLink}} variable into promotion email template
+- [x] Email: plain-text fallback includes registration link
+- [x] Email: prominent "Register & Enroll Now" CTA button in default template
+- [x] Public enrollment landing page (/enroll/:token) — pre-fills parent info, shows product details, submit to confirm enrollment
+- [x] Vitest tests for token generation, resolution, and enrollment confirmation (136 total passing)

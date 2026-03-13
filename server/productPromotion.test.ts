@@ -98,7 +98,7 @@ describe("productPromotions router", () => {
     const caller = appRouter.createCaller(makePromoterCtx(2));
     const result = await caller.productPromotions.send({ parentId: 10, productId: 5, message: "Check this out!" });
     expect(result.success).toBe(true);
-    expect(db.sendProductPromotion).toHaveBeenCalledWith({ promoterId: 2, parentId: 10, productId: 5, message: "Check this out!" });
+    expect(db.sendProductPromotion).toHaveBeenCalledWith(expect.objectContaining({ promoterId: 2, parentId: 10, productId: 5, message: "Check this out!", enrollmentToken: expect.any(String) }));
   });
 
   it("promoter cannot send promotion to another promoter's parent", async () => {

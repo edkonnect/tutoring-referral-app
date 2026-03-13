@@ -149,6 +149,7 @@ export const productPromotions = mysqlTable("product_promotions", {
   parentId: int("parentId").notNull(),       // references parents.id
   productId: int("productId").notNull(),     // references products.id
   message: text("message"),                  // optional personal message
+  enrollmentToken: varchar("enrollmentToken", { length: 64 }).unique(), // unique token for parent self-enrollment link
   sentAt: timestamp("sentAt").defaultNow().notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });

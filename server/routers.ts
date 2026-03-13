@@ -59,6 +59,7 @@ import {
   deletePromoTemplate,
   associateTemplateToProduct,
   getProductWithTemplate,
+  getPromotionByEnrollmentToken,
 } from "./db";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
@@ -760,6 +761,7 @@ const productPromotionsRouter = router({
         parentId: z.number(),
         productId: z.number(),
         message: z.string().optional(),
+        origin: z.string().url().optional().default("https://app.example.com"),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -776,7 +778,14 @@ const productPromotionsRouter = router({
       const product = await getProductById(input.productId);
       if (!product || !product.active) throw new TRPCError({ code: "NOT_FOUND", message: "Product not found or inactive" });
 
-      await sendProductPromotion({ promoterId, parentId: input.parentId, productId: input.productId, message: input.message });
+      // Generate a unique enrollment token for this promotion
+      const { nanoid } = await import("nanoid");
+      const enrollmentToken = nanoid(32);
+
+      await sendProductPromotion({ promoterId, parentId: input.parentId, productId: input.productId, message: input.message, enrollmentToken });
+
+      // Build the registration link — frontend passes its origin so the URL is always correct
+      const registrationLink = `${input.origin}/enroll/${enrollmentToken}`;
 
       // Email the parent — use associated template if available, else fall back to default
       if (parent.email) {
@@ -792,7 +801,7 @@ const productPromotionsRouter = router({
         let emailText: string | undefined;
 
         if (template) {
-          // Interpolate template variables
+          // Interpolate template variables (including registrationLink)
           const vars: Record<string, string> = {
             promoterName,
             parentName: parent.name,
@@ -801,6 +810,7 @@ const productPromotionsRouter = router({
             productDescription: product.description ?? "",
             productCategory: product.category ?? "",
             message: input.message ?? "",
+            registrationLink,
           };
           const interpolate = (str: string) =>
             str.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? "");
@@ -824,7 +834,7 @@ const productPromotionsRouter = router({
             : "";
 
           emailSubject = `${promoterName} shared a tutoring program with you: ${product.name}`;
-          emailText = `Hi ${parent.name},\n\n${promoterName} thought you might be interested in our ${product.name} program.\n\n${product.description ?? ""}\n\nPrice: ${priceDisplay}\n\n${input.message ? `Message from ${promoterName}: "${input.message}"` : ""}\n\nPlease contact us to learn more or enroll.`;
+          emailText = `Hi ${parent.name},\n\n${promoterName} thought you might be interested in our ${product.name} program.\n\n${product.description ?? ""}\n\nPrice: ${priceDisplay}\n\n${input.message ? `Message from ${promoterName}: "${input.message}"` : ""}\n\nRegister now to enroll your child:\n${registrationLink}`;
           emailHtml = `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
@@ -848,7 +858,10 @@ const productPromotionsRouter = router({
         </div>
       </div>
       ${messageSection}
-      <p style="color:#475569;font-size:14px;">To learn more or enroll your child, please reply to this email or contact us directly.</p>
+      <div style="text-align:center;margin:24px 0;">
+        <a href="${registrationLink}" style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:8px;font-size:16px;font-weight:700;">Register &amp; Enroll Now</a>
+      </div>
+      <p style="color:#94a3b8;font-size:12px;text-align:center;">Or copy this link: <a href="${registrationLink}" style="color:#3b82f6;">${registrationLink}</a></p>
     </div>
     <div style="background:#f1f5f9;padding:16px 32px;text-align:center;">
       <p style="margin:0;color:#94a3b8;font-size:12px;">You received this email because ${promoterName} referred you to our tutoring program.</p>
@@ -952,6 +965,94 @@ const productPromotionsRouter = router({
 
   // Admin lists all product enrollment credits (for payout management)
   listEnrollments: adminProcedure.query(() => getAllProductEnrollments()),
+
+  // Public: resolve an enrollment token → returns promotion details for the landing page
+  resolveEnrollmentToken: publicProcedure
+    .input(z.object({ token: z.string() }))
+    .query(async ({ input }) => {
+      const promotion = await getPromotionByEnrollmentToken(input.token);
+      if (!promotion) throw new TRPCError({ code: "NOT_FOUND", message: "Enrollment link not found or expired" });
+
+      const [product, parent, promoter, enrollment] = await Promise.all([
+        getProductById(promotion.productId),
+        getParentById(promotion.parentId),
+        getUserById(promotion.promoterId),
+        getProductEnrollmentByPromotionId(promotion.id),
+      ]);
+
+      return {
+        promotionId: promotion.id,
+        alreadyEnrolled: !!enrollment,
+        product: product ? {
+          id: product.id,
+          name: product.name,
+          description: product.description,
+          price: product.price,
+          category: product.category,
+        } : null,
+        parent: parent ? {
+          name: parent.name,
+          email: parent.email,
+        } : null,
+        promoterName: promoter?.name ?? null,
+      };
+    }),
+
+  // Public: parent self-enrolls via the enrollment link
+  selfEnroll: publicProcedure
+    .input(z.object({
+      token: z.string(),
+      parentName: z.string().min(1, "Name is required"),
+      parentEmail: z.string().email("Valid email is required"),
+    }))
+    .mutation(async ({ input }) => {
+      const promotion = await getPromotionByEnrollmentToken(input.token);
+      if (!promotion) throw new TRPCError({ code: "NOT_FOUND", message: "Enrollment link not found or expired" });
+
+      // Check not already enrolled
+      const existing = await getProductEnrollmentByPromotionId(promotion.id);
+      if (existing) throw new TRPCError({ code: "CONFLICT", message: "You have already enrolled in this program" });
+
+      // Update parent info if provided (they may have a different name/email)
+      await updateParent(promotion.parentId, { name: input.parentName, email: input.parentEmail });
+
+      // Create the enrollment record ($25 credit for promoter)
+      await confirmProductEnrollment({
+        promotionId: promotion.id,
+        promoterId: promotion.promoterId,
+        parentId: promotion.parentId,
+        productId: promotion.productId,
+      });
+
+      // Notify the promoter
+      const [promoter, product, parent] = await Promise.all([
+        getUserById(promotion.promoterId),
+        getProductById(promotion.productId),
+        getParentById(promotion.parentId),
+      ]);
+
+      if (promoter?.email && product && parent) {
+        try {
+          await sendEmail({
+            to: promoter.email,
+            subject: `🎉 ${input.parentName} just enrolled in ${product.name}!`,
+            html: `
+              <div style="font-family:sans-serif;max-width:600px;margin:0 auto;">
+                <h2 style="color:#2563eb;">Great news, ${promoter.name || "Promoter"}!</h2>
+                <p><strong>${input.parentName}</strong> has enrolled in <strong>${product.name}</strong> using your referral link.</p>
+                <p>A <strong>$25.00 referral credit</strong> has been added to your account.</p>
+                <p style="color:#6b7280;font-size:0.875rem;">Log in to your dashboard to view your earnings and payout status.</p>
+              </div>
+            `,
+            text: `Great news! ${input.parentName} has enrolled in ${product.name} using your referral link. A $25.00 referral credit has been added to your account.`,
+          });
+        } catch (err) {
+          console.error("[Email] Failed to notify promoter on self-enrollment:", err);
+        }
+      }
+
+      return { success: true };
+    }),
 
   // Promoter views their own product enrollment credits
   myEarnings: promoterProcedure.query(async ({ ctx }) => {

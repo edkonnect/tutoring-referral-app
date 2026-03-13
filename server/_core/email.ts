@@ -1,3 +1,4 @@
+import nodemailer from "nodemailer";
 import { ENV } from "./env";
 
 export type EmailPayload = {
@@ -7,46 +8,49 @@ export type EmailPayload = {
   text?: string;
 };
 
-/**
- * Send an email using the Manus built-in Forge API email service.
- * Falls back gracefully if the service is unavailable.
- */
-export async function sendEmail(payload: EmailPayload): Promise<boolean> {
-  if (!ENV.forgeApiUrl || !ENV.forgeApiKey) {
-    console.warn("[Email] Forge API not configured, skipping email send");
-    return false;
+let _transporter: nodemailer.Transporter | null = null;
+
+function getTransporter(): nodemailer.Transporter | null {
+  if (_transporter) return _transporter;
+
+  if (!ENV.gmailUser || !ENV.gmailAppPassword) {
+    console.warn("[Email] Gmail credentials not configured (GMAIL_USER / GMAIL_APP_PASSWORD missing)");
+    return null;
   }
 
-  const baseUrl = ENV.forgeApiUrl.endsWith("/") ? ENV.forgeApiUrl : `${ENV.forgeApiUrl}/`;
-  const endpoint = new URL("webdevtoken.v1.WebDevService/SendEmail", baseUrl).toString();
+  _transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: ENV.gmailUser,
+      pass: ENV.gmailAppPassword,
+    },
+  });
+
+  return _transporter;
+}
+
+/**
+ * Send a transactional email via Gmail SMTP using nodemailer.
+ * Returns true on success, false on failure (never throws).
+ */
+export async function sendEmail(payload: EmailPayload): Promise<boolean> {
+  const transporter = getTransporter();
+  if (!transporter) return false;
 
   try {
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        accept: "application/json",
-        "content-type": "application/json",
-        "connect-protocol-version": "1",
-        authorization: `Bearer ${ENV.forgeApiKey}`,
-      },
-      body: JSON.stringify({
-        to: payload.to,
-        subject: payload.subject,
-        html: payload.html,
-        text: payload.text ?? payload.subject,
-      }),
+    const info = await transporter.sendMail({
+      from: `"Tutoring Referral Manager" <${ENV.gmailUser}>`,
+      to: payload.to,
+      subject: payload.subject,
+      html: payload.html,
+      text: payload.text ?? payload.subject,
     });
 
-    if (!response.ok) {
-      const detail = await response.text().catch(() => "");
-      console.warn(`[Email] Failed to send email (${response.status})${detail ? `: ${detail}` : ""}`);
-      return false;
-    }
-
-    console.log(`[Email] Successfully sent email to ${payload.to}`);
+    console.log(`[Email] Sent to ${payload.to} — messageId: ${info.messageId}`);
     return true;
-  } catch (error) {
-    console.warn("[Email] Error sending email:", error);
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error(`[Email] Failed to send to ${payload.to}: ${msg}`);
     return false;
   }
 }

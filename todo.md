@@ -166,3 +166,18 @@
 - [x] Setup link uses existing /setup/:token route (7-day expiry)
 - [x] AccountSetup page polished: step banner, password strength meter, match indicator, icons
 - [x] Vitest tests confirmed: 83 tests passing (no new tests needed, existing inviteAuth.test.ts covers this)
+
+## Fix: Promoter Invitation Email Not Delivered
+- [ ] Audit email helper (server/_core/email.ts) for correct API usage
+- [ ] Audit createPromoter procedure for correct email call
+- [ ] Check server logs for email errors
+- [ ] Fix root cause and verify email delivery
+
+## Fix: Gmail SMTP Email Integration
+- [x] Root cause identified: Forge API SendEmail endpoint does not exist (404)
+- [x] Installed nodemailer + @types/nodemailer
+- [x] Stored GMAIL_USER and GMAIL_APP_PASSWORD as project secrets
+- [x] Rewrote server/_core/email.ts to use Gmail SMTP via nodemailer
+- [x] Added gmailUser and gmailAppPassword to ENV in env.ts
+- [x] Live SMTP test confirmed: email delivered to arunemba@gmail.com
+- [x] All 85 vitest tests passing (including live Gmail SMTP test)

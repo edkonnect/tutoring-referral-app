@@ -159,3 +159,10 @@
 - [x] Email includes product name, description, price, category, and promoter name
 - [x] Email includes a call-to-action message from the promoter (if provided)
 - [x] Vitest tests for parent email notification on promotion send (2 tests, 83 total passing)
+
+## Promoter Registration Email on Account Creation
+- [x] Admin createPromoter sends styled welcome/registration email with setup link
+- [x] Email includes promoter name, $50/$25 earnings table, 3-step guide, and CTA button
+- [x] Setup link uses existing /setup/:token route (7-day expiry)
+- [x] AccountSetup page polished: step banner, password strength meter, match indicator, icons
+- [x] Vitest tests confirmed: 83 tests passing (no new tests needed, existing inviteAuth.test.ts covers this)

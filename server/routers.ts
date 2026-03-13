@@ -335,32 +335,73 @@ const adminRouter = router({
           : `${ctx.req.protocol}://${ctx.req.headers.host}`);
       const setupUrl = `${origin}/setup/${token}`;
 
-      // Send invitation email
+      // Send registration/welcome email
       try {
         await sendEmail({
           to: input.email,
-          subject: `You've been invited to join the Tutoring Referral Program`,
+          subject: `Welcome! Set up your Tutoring Referral Program account`,
+          text: `Hi ${input.name},\n\nYou have been added as a promoter for the Tutoring Referral Program. Click the link below to create your account and set your password:\n\n${setupUrl}\n\nThis link expires in 7 days.\n\nOnce your account is active you can start referring parents and earning $50 for every student who enrolls.`,
           html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
-              <div style="background: #1e40af; padding: 24px; border-radius: 8px 8px 0 0; text-align: center;">
-                <h1 style="color: #fff; margin: 0; font-size: 24px;">Welcome to the Referral Program!</h1>
-              </div>
-              <div style="background: #f9fafb; padding: 24px; border-radius: 0 0 8px 8px; border: 1px solid #e5e7eb;">
-                <p style="font-size: 16px;">Hi <strong>${input.name}</strong>,</p>
-                <p style="font-size: 16px;">You've been invited as a promoter for our tutoring referral program. Click the button below to set up your account and start earning $50 for every student you refer who enrolls.</p>
-                <div style="text-align: center; margin: 28px 0;">
-                  <a href="${setupUrl}" style="background: #1e40af; color: #fff; padding: 14px 28px; border-radius: 6px; text-decoration: none; font-size: 16px; font-weight: bold;">Set Up My Account</a>
-                </div>
-                <p style="font-size: 13px; color: #6b7280;">Or copy this link into your browser:<br/><a href="${setupUrl}" style="color: #1e40af; word-break: break-all;">${setupUrl}</a></p>
-                <p style="font-size: 13px; color: #6b7280;">This invitation link expires in <strong>7 days</strong>.</p>
-                <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;" />
-                <p style="font-size: 12px; color: #9ca3af; text-align: center;">Tutoring Referral Manager &mdash; Earn $50 for every student you refer who enrolls!</p>
-              </div>
-            </div>
-          `,
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:'Segoe UI',Arial,sans-serif;">
+  <div style="max-width:580px;margin:40px auto;background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.10);">
+    <!-- Header -->
+    <div style="background:linear-gradient(135deg,#1e3a8a 0%,#2563eb 100%);padding:36px 40px 28px;text-align:center;">
+      <div style="display:inline-block;background:rgba(255,255,255,0.15);border-radius:50%;padding:14px;margin-bottom:14px;">
+        <span style="font-size:32px;">&#127891;</span>
+      </div>
+      <h1 style="margin:0;color:#ffffff;font-size:26px;font-weight:700;letter-spacing:-0.3px;">You're Invited!</h1>
+      <p style="margin:8px 0 0;color:#bfdbfe;font-size:15px;">Tutoring Referral Program</p>
+    </div>
+    <!-- Body -->
+    <div style="padding:36px 40px;">
+      <p style="margin:0 0 12px;color:#0f172a;font-size:16px;">Hi <strong>${input.name}</strong>,</p>
+      <p style="margin:0 0 20px;color:#475569;font-size:15px;line-height:1.6;">You have been added as a <strong>Promoter</strong> for our tutoring referral program. Create your account to access your personal dashboard and start earning referral credits.</p>
+      <!-- Earnings highlight -->
+      <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:18px 22px;margin-bottom:24px;">
+        <table style="width:100%;border-collapse:collapse;">
+          <tr>
+            <td style="text-align:center;padding:8px;">
+              <div style="font-size:28px;font-weight:800;color:#1d4ed8;">$50</div>
+              <div style="font-size:12px;color:#3b82f6;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Per Student Enrolled</div>
+            </td>
+            <td style="width:1px;background:#bfdbfe;"></td>
+            <td style="text-align:center;padding:8px;">
+              <div style="font-size:28px;font-weight:800;color:#1d4ed8;">$25</div>
+              <div style="font-size:12px;color:#3b82f6;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Per Product Enrolled</div>
+            </td>
+          </tr>
+        </table>
+      </div>
+      <!-- CTA Button -->
+      <div style="text-align:center;margin:28px 0;">
+        <a href="${setupUrl}" style="display:inline-block;background:linear-gradient(135deg,#1e3a8a,#2563eb);color:#ffffff;padding:15px 36px;border-radius:8px;text-decoration:none;font-size:16px;font-weight:700;letter-spacing:0.2px;box-shadow:0 4px 12px rgba(37,99,235,0.35);">Create My Account &rarr;</a>
+      </div>
+      <!-- Steps -->
+      <div style="background:#f8fafc;border-radius:10px;padding:18px 22px;margin-bottom:20px;">
+        <p style="margin:0 0 10px;font-size:13px;font-weight:700;color:#0f172a;text-transform:uppercase;letter-spacing:0.5px;">Getting Started</p>
+        <table style="width:100%;border-collapse:collapse;">
+          <tr><td style="padding:5px 0;vertical-align:top;"><span style="display:inline-block;background:#2563eb;color:#fff;border-radius:50%;width:20px;height:20px;text-align:center;line-height:20px;font-size:11px;font-weight:700;margin-right:10px;">1</span></td><td style="padding:5px 0;color:#475569;font-size:14px;">Click the button above to create your account</td></tr>
+          <tr><td style="padding:5px 0;vertical-align:top;"><span style="display:inline-block;background:#2563eb;color:#fff;border-radius:50%;width:20px;height:20px;text-align:center;line-height:20px;font-size:11px;font-weight:700;margin-right:10px;">2</span></td><td style="padding:5px 0;color:#475569;font-size:14px;">Set your email address and password</td></tr>
+          <tr><td style="padding:5px 0;vertical-align:top;"><span style="display:inline-block;background:#2563eb;color:#fff;border-radius:50%;width:20px;height:20px;text-align:center;line-height:20px;font-size:11px;font-weight:700;margin-right:10px;">3</span></td><td style="padding:5px 0;color:#475569;font-size:14px;">Add parents &amp; students and track your earnings</td></tr>
+        </table>
+      </div>
+      <!-- Fallback link -->
+      <p style="font-size:12px;color:#94a3b8;margin:0;">Can't click the button? Copy this link into your browser:<br/><a href="${setupUrl}" style="color:#2563eb;word-break:break-all;">${setupUrl}</a></p>
+    </div>
+    <!-- Footer -->
+    <div style="background:#f1f5f9;padding:18px 40px;text-align:center;border-top:1px solid #e2e8f0;">
+      <p style="margin:0 0 4px;color:#64748b;font-size:12px;font-weight:600;">Tutoring Referral Manager</p>
+      <p style="margin:0;color:#94a3b8;font-size:11px;">This invitation link expires in <strong>7 days</strong>. If you did not expect this email, you can safely ignore it.</p>
+    </div>
+  </div>
+</body>
+</html>`,
         });
       } catch (err) {
-        console.error("[Email] Failed to send invite email:", err);
+        console.error("[Email] Failed to send registration email:", err);
       }
 
       return { success: true };

@@ -181,3 +181,20 @@
 - [x] Added gmailUser and gmailAppPassword to ENV in env.ts
 - [x] Live SMTP test confirmed: email delivered to arunemba@gmail.com
 - [x] All 85 vitest tests passing (including live Gmail SMTP test)
+
+## Product CRUD (Admin)
+- [x] Backend: createProduct procedure (admin-only)
+- [x] Backend: updateProduct procedure (admin-only)
+- [x] Backend: deleteProduct procedure (admin-only)
+- [x] Backend: getProductById procedure
+- [x] Backend: listProducts procedure (all, with active filter)
+- [x] Admin Products page: product table with name, category, price, status
+- [x] Admin Products page: Create Product dialog (name, description, price, category)
+- [x] Admin Products page: Edit Product dialog (pre-filled, with active toggle)
+- [x] Admin Products page: Delete with AlertDialog confirmation
+- [x] Admin Products page: Inline active/inactive quick-toggle switch per row
+- [x] Admin Products page: Search, status filter tabs, category filter pills
+- [x] Vitest tests for product CRUD role guards and validation (13 tests, 98 total passing)
+- [x] Stats header (total, active, inactive counts)
+- [x] View detail slide-over panel (Sheet) with metadata and quick actions
+- [x] Result count footer on table

@@ -754,11 +754,11 @@ const productsRouter = router({
 // ─── Product Promotions Router ─────────────────────────────────────────────────────
 
 const productPromotionsRouter = router({
-  // Promoter sends a product promotion to a parent
+  // Promoter sends a product promotion to one or more parents
   send: promoterProcedure
     .input(
       z.object({
-        parentId: z.number(),
+        parentIds: z.array(z.number()).min(1, "Select at least one parent"),
         productId: z.number(),
         message: z.string().optional(),
         origin: z.string().url().optional().default("https://app.example.com"),
@@ -767,75 +767,73 @@ const productPromotionsRouter = router({
     .mutation(async ({ input, ctx }) => {
       const promoterId = ctx.user.id;
 
-      // Verify the parent belongs to this promoter (or admin)
-      const parent = await getParentById(input.parentId);
-      if (!parent) throw new TRPCError({ code: "NOT_FOUND", message: "Parent not found" });
-      if (ctx.user.role !== "admin" && parent.promoterId !== promoterId) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Parent does not belong to you" });
-      }
-
       // Verify product exists and is active
       const product = await getProductById(input.productId);
       if (!product || !product.active) throw new TRPCError({ code: "NOT_FOUND", message: "Product not found or inactive" });
 
-      // Generate a unique enrollment token for this promotion
       const { nanoid } = await import("nanoid");
-      const enrollmentToken = nanoid(32);
+      const promoterName = ctx.user.name ?? "Your referrer";
+      const priceDisplay = product.price ? `$${parseFloat(product.price).toFixed(2)}` : "Contact us for pricing";
 
-      await sendProductPromotion({ promoterId, parentId: input.parentId, productId: input.productId, message: input.message, enrollmentToken });
+      // Fetch template once for all parents
+      const productWithTemplate = await getProductWithTemplate(input.productId);
+      const template = productWithTemplate?.template;
 
-      // Build the registration link — frontend passes its origin so the URL is always correct
-      const registrationLink = `${input.origin}/enroll/${enrollmentToken}`;
+      const results: { parentId: number; success: boolean; error?: string }[] = [];
 
-      // Email the parent — use associated template if available, else fall back to default
-      if (parent.email) {
-        const promoterName = ctx.user.name ?? "Your referrer";
-        const priceDisplay = product.price ? `$${parseFloat(product.price).toFixed(2)}` : "Contact us for pricing";
+      for (const parentId of input.parentIds) {
+        try {
+          // Verify this parent belongs to the promoter (or admin)
+          const parent = await getParentById(parentId);
+          if (!parent) { results.push({ parentId, success: false, error: "Parent not found" }); continue; }
+          if (ctx.user.role !== "admin" && parent.promoterId !== promoterId) {
+            results.push({ parentId, success: false, error: "Parent does not belong to you" }); continue;
+          }
 
-        // Fetch the product's associated template
-        const productWithTemplate = await getProductWithTemplate(input.productId);
-        const template = productWithTemplate?.template;
+          // Generate a unique enrollment token per parent
+          const enrollmentToken = nanoid(32);
+          await sendProductPromotion({ promoterId, parentId, productId: input.productId, message: input.message, enrollmentToken });
 
-        let emailSubject: string;
-        let emailHtml: string;
-        let emailText: string | undefined;
+          const registrationLink = `${input.origin}/enroll/${enrollmentToken}`;
 
-        if (template) {
-          // Interpolate template variables (including registrationLink)
-          const vars: Record<string, string> = {
-            promoterName,
-            parentName: parent.name,
-            productName: product.name,
-            productPrice: priceDisplay,
-            productDescription: product.description ?? "",
-            productCategory: product.category ?? "",
-            message: input.message ?? "",
-            registrationLink,
-          };
-          const interpolate = (str: string) =>
-            str.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? "");
+          // Email the parent
+          if (parent.email) {
+            let emailSubject: string;
+            let emailHtml: string;
+            let emailText: string | undefined;
 
-          emailSubject = interpolate(template.subject);
-          emailHtml = interpolate(template.htmlBody);
-          emailText = template.textBody ? interpolate(template.textBody) : undefined;
-        } else {
-          // Default built-in template
-          const categoryDisplay = product.category
-            ? `<span style="display:inline-block;background:#e0f2fe;color:#0369a1;padding:2px 10px;border-radius:12px;font-size:13px;">${product.category}</span>`
-            : "";
-          const messageSection = input.message
-            ? `<div style="background:#f0fdf4;border-left:4px solid #22c55e;padding:12px 16px;margin:16px 0;border-radius:0 8px 8px 0;">
-                <p style="margin:0;font-style:italic;color:#166534;">&ldquo;${input.message}&rdquo;</p>
-                <p style="margin:6px 0 0;font-size:12px;color:#4ade80;">— ${promoterName}</p>
-               </div>`
-            : "";
-          const descSection = product.description
-            ? `<p style="color:#475569;line-height:1.6;">${product.description}</p>`
-            : "";
-
-          emailSubject = `${promoterName} shared a tutoring program with you: ${product.name}`;
-          emailText = `Hi ${parent.name},\n\n${promoterName} thought you might be interested in our ${product.name} program.\n\n${product.description ?? ""}\n\nPrice: ${priceDisplay}\n\n${input.message ? `Message from ${promoterName}: "${input.message}"` : ""}\n\nRegister now to enroll your child:\n${registrationLink}`;
-          emailHtml = `<!DOCTYPE html>
+            if (template) {
+              const vars: Record<string, string> = {
+                promoterName,
+                parentName: parent.name,
+                productName: product.name,
+                productPrice: priceDisplay,
+                productDescription: product.description ?? "",
+                productCategory: product.category ?? "",
+                message: input.message ?? "",
+                registrationLink,
+              };
+              const interpolate = (str: string) =>
+                str.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? "");
+              emailSubject = interpolate(template.subject);
+              emailHtml = interpolate(template.htmlBody);
+              emailText = template.textBody ? interpolate(template.textBody) : undefined;
+            } else {
+              const categoryDisplay = product.category
+                ? `<span style="display:inline-block;background:#e0f2fe;color:#0369a1;padding:2px 10px;border-radius:12px;font-size:13px;">${product.category}</span>`
+                : "";
+              const messageSection = input.message
+                ? `<div style="background:#f0fdf4;border-left:4px solid #22c55e;padding:12px 16px;margin:16px 0;border-radius:0 8px 8px 0;">
+                    <p style="margin:0;font-style:italic;color:#166534;">&ldquo;${input.message}&rdquo;</p>
+                    <p style="margin:6px 0 0;font-size:12px;color:#4ade80;">— ${promoterName}</p>
+                   </div>`
+                : "";
+              const descSection = product.description
+                ? `<p style="color:#475569;line-height:1.6;">${product.description}</p>`
+                : "";
+              emailSubject = `${promoterName} shared a tutoring program with you: ${product.name}`;
+              emailText = `Hi ${parent.name},\n\n${promoterName} thought you might be interested in our ${product.name} program.\n\n${product.description ?? ""}\n\nPrice: ${priceDisplay}\n\n${input.message ? `Message from ${promoterName}: "${input.message}"` : ""}\n\nRegister now to enroll your child:\n${registrationLink}`;
+              emailHtml = `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background:#f8fafc;font-family:'Segoe UI',Arial,sans-serif;">
@@ -869,12 +867,25 @@ const productPromotionsRouter = router({
   </div>
 </body>
 </html>`;
-        }
+            }
 
-        await sendEmail({ to: parent.email, subject: emailSubject, html: emailHtml, text: emailText });
+            try {
+              await sendEmail({ to: parent.email, subject: emailSubject, html: emailHtml, text: emailText });
+            } catch (emailErr) {
+              console.error(`[Email] Failed to send to parent ${parentId}:`, emailErr);
+            }
+          }
+
+          results.push({ parentId, success: true });
+        } catch (err) {
+          console.error(`[Promotion] Failed for parent ${parentId}:`, err);
+          results.push({ parentId, success: false, error: err instanceof Error ? err.message : "Unknown error" });
+        }
       }
 
-      return { success: true };
+      const sent = results.filter((r) => r.success).length;
+      const failed = results.filter((r) => !r.success).length;
+      return { success: true, sent, failed, results };
     }),
 
   // Promoter views their own sent promotions

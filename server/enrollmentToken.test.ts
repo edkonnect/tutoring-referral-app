@@ -291,7 +291,7 @@ describe("productPromotions.send — enrollment token generation", () => {
     const { sendProductPromotion } = await import("./db");
     const caller = appRouter.createCaller(promoterCtx);
     await caller.productPromotions.send({
-      parentId: 10,
+      parentIds: [10],
       productId: 5,
       origin: "https://app.example.com",
     });
@@ -304,7 +304,7 @@ describe("productPromotions.send — enrollment token generation", () => {
     const { sendProductPromotion } = await import("./db");
     const caller = appRouter.createCaller(promoterCtx);
     await caller.productPromotions.send({
-      parentId: 10,
+      parentIds: [10],
       productId: 5,
       origin: "https://app.example.com",
     });

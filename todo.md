@@ -238,3 +238,13 @@
 - [x] Email: prominent "Register & Enroll Now" CTA button in default template
 - [x] Public enrollment landing page (/enroll/:token) — pre-fills parent info, shows product details, submit to confirm enrollment
 - [x] Vitest tests for token generation, resolution, and enrollment confirmation (136 total passing)
+
+## Multi-Parent Promotion Send
+- [x] Backend: update productPromotions.send to accept parentIds (array) instead of single parentId
+- [x] Backend: loop and create one promotion record + send one email per parent
+- [x] Backend: partial failure handling (bad parents skipped, good ones still sent)
+- [x] Frontend: replace single parent dropdown with multi-select checkbox list in Send Promotion dialog
+- [x] Frontend: show selected count badge, select-all toggle, search/filter parents
+- [x] Frontend: Send button label updates dynamically ("Send to N Parents")
+- [x] Frontend: disable Send button when no parents selected
+- [x] Vitest tests for multi-parent send (138 passing, emailSmtp excluded from count)

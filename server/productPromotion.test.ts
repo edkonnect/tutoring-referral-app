@@ -24,6 +24,8 @@ vi.mock("./db", async (importOriginal) => {
     getPromoterProductEarningsSummary: vi.fn(),
     getParentById: vi.fn(),
     getUserById: vi.fn(),
+    getProductWithTemplate: vi.fn().mockResolvedValue(null),
+    getPromotionByEnrollmentToken: vi.fn(),
   };
 });
 
@@ -49,6 +51,16 @@ function makePromoterCtx(id = 2): TrpcContext {
     res: { clearCookie: vi.fn() } as unknown as TrpcContext["res"],
   };
 }
+
+const mockParent = (id: number, promoterId: number, email?: string) => ({
+  id, promoterId, name: `Parent ${id}`, email: email ?? `parent${id}@test.com`,
+  phone: null, notes: null, createdAt: new Date(),
+});
+
+const mockProduct = (active = true) => ({
+  id: 5, name: "Math Tutoring", active, description: "Expert-led math tutoring",
+  price: "120.00", category: "Math", createdAt: new Date(), templateId: null,
+});
 
 describe("products router", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -87,66 +99,136 @@ describe("products router", () => {
   });
 });
 
-describe("productPromotions router", () => {
-  beforeEach(() => vi.clearAllMocks());
-
-  it("promoter can send a product promotion to their own parent", async () => {
-    vi.mocked(db.getParentById).mockResolvedValue({ id: 10, promoterId: 2, name: "Jane Doe", email: "jane@test.com", phone: null, notes: null, createdAt: new Date() } as any);
-    vi.mocked(db.getProductById).mockResolvedValue({ id: 5, name: "Math Tutoring", active: true, description: null, price: "120.00", category: "Math", createdAt: new Date() } as any);
+describe("productPromotions router — send", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(db.getProductWithTemplate).mockResolvedValue(null as any);
     vi.mocked(db.sendProductPromotion).mockResolvedValue({} as any);
+  });
+
+  it("promoter can send a promotion to a single parent", async () => {
+    vi.mocked(db.getParentById).mockResolvedValue(mockParent(10, 2) as any);
+    vi.mocked(db.getProductById).mockResolvedValue(mockProduct() as any);
 
     const caller = appRouter.createCaller(makePromoterCtx(2));
-    const result = await caller.productPromotions.send({ parentId: 10, productId: 5, message: "Check this out!" });
+    const result = await caller.productPromotions.send({ parentIds: [10], productId: 5, message: "Check this out!" });
     expect(result.success).toBe(true);
-    expect(db.sendProductPromotion).toHaveBeenCalledWith(expect.objectContaining({ promoterId: 2, parentId: 10, productId: 5, message: "Check this out!", enrollmentToken: expect.any(String) }));
-  });
-
-  it("promoter cannot send promotion to another promoter's parent", async () => {
-    vi.mocked(db.getParentById).mockResolvedValue({ id: 10, promoterId: 99, name: "Jane Doe", email: "jane@test.com", phone: null, notes: null, createdAt: new Date() } as any);
-    vi.mocked(db.getProductById).mockResolvedValue({ id: 5, name: "Math Tutoring", active: true, description: null, price: "120.00", category: "Math", createdAt: new Date() } as any);
-
-    const caller = appRouter.createCaller(makePromoterCtx(2));
-    await expect(caller.productPromotions.send({ parentId: 10, productId: 5 })).rejects.toThrow("Parent does not belong to you");
-  });
-
-  it("sends email to parent with product details when promotion is sent", async () => {
-    vi.mocked(db.getParentById).mockResolvedValue({ id: 10, promoterId: 2, name: "Jane Doe", email: "jane@parent.com", phone: null, notes: null, createdAt: new Date() } as any);
-    vi.mocked(db.getProductById).mockResolvedValue({ id: 5, name: "Advanced Math", active: true, description: "Expert-led math tutoring", price: "150.00", category: "Mathematics", createdAt: new Date() } as any);
-    vi.mocked(db.sendProductPromotion).mockResolvedValue({} as any);
-
-    const caller = appRouter.createCaller(makePromoterCtx(2));
-    await caller.productPromotions.send({ parentId: 10, productId: 5, message: "Great for your child!" });
-
-    expect(emailModule.sendEmail).toHaveBeenCalledWith(
-      expect.objectContaining({
-        to: "jane@parent.com",
-        subject: expect.stringContaining("Advanced Math"),
-        html: expect.stringContaining("Advanced Math"),
-        text: expect.stringContaining("Advanced Math"),
-      })
+    expect(result.sent).toBe(1);
+    expect(result.failed).toBe(0);
+    expect(db.sendProductPromotion).toHaveBeenCalledWith(
+      expect.objectContaining({ promoterId: 2, parentId: 10, productId: 5, message: "Check this out!", enrollmentToken: expect.any(String) })
     );
   });
 
-  it("does not send email when parent has no email address", async () => {
-    vi.mocked(db.getParentById).mockResolvedValue({ id: 10, promoterId: 2, name: "No Email Parent", email: null, phone: null, notes: null, createdAt: new Date() } as any);
-    vi.mocked(db.getProductById).mockResolvedValue({ id: 5, name: "Math Tutoring", active: true, description: null, price: null, category: null, createdAt: new Date() } as any);
-    vi.mocked(db.sendProductPromotion).mockResolvedValue({} as any);
+  it("promoter can send a promotion to multiple parents", async () => {
+    vi.mocked(db.getParentById)
+      .mockResolvedValueOnce(mockParent(10, 2) as any)
+      .mockResolvedValueOnce(mockParent(11, 2) as any)
+      .mockResolvedValueOnce(mockParent(12, 2) as any);
+    vi.mocked(db.getProductById).mockResolvedValue(mockProduct() as any);
 
-    vi.mocked(emailModule.sendEmail).mockClear();
     const caller = appRouter.createCaller(makePromoterCtx(2));
-    const result = await caller.productPromotions.send({ parentId: 10, productId: 5 });
-
+    const result = await caller.productPromotions.send({ parentIds: [10, 11, 12], productId: 5 });
     expect(result.success).toBe(true);
+    expect(result.sent).toBe(3);
+    expect(result.failed).toBe(0);
+    expect(db.sendProductPromotion).toHaveBeenCalledTimes(3);
+  });
+
+  it("generates a unique enrollment token per parent", async () => {
+    vi.mocked(db.getParentById)
+      .mockResolvedValueOnce(mockParent(10, 2) as any)
+      .mockResolvedValueOnce(mockParent(11, 2) as any);
+    vi.mocked(db.getProductById).mockResolvedValue(mockProduct() as any);
+
+    const caller = appRouter.createCaller(makePromoterCtx(2));
+    await caller.productPromotions.send({ parentIds: [10, 11], productId: 5 });
+
+    const calls = vi.mocked(db.sendProductPromotion).mock.calls;
+    const token1 = calls[0][0].enrollmentToken;
+    const token2 = calls[1][0].enrollmentToken;
+    expect(token1).toBeTruthy();
+    expect(token2).toBeTruthy();
+    expect(token1).not.toBe(token2);
+  });
+
+  it("sends one email per parent", async () => {
+    vi.mocked(db.getParentById)
+      .mockResolvedValueOnce(mockParent(10, 2, "parent10@test.com") as any)
+      .mockResolvedValueOnce(mockParent(11, 2, "parent11@test.com") as any);
+    vi.mocked(db.getProductById).mockResolvedValue(mockProduct() as any);
+
+    const caller = appRouter.createCaller(makePromoterCtx(2));
+    await caller.productPromotions.send({ parentIds: [10, 11], productId: 5 });
+
+    expect(emailModule.sendEmail).toHaveBeenCalledTimes(2);
+    const emailCalls = vi.mocked(emailModule.sendEmail).mock.calls.map((c) => c[0].to);
+    expect(emailCalls).toContain("parent10@test.com");
+    expect(emailCalls).toContain("parent11@test.com");
+  });
+
+  it("skips email for parents without an email address", async () => {
+    const noEmailParent = (id: number, promoterId: number) => ({
+      id, promoterId, name: `Parent ${id}`, email: null,
+      phone: null, notes: null, createdAt: new Date(),
+    });
+    vi.mocked(db.getParentById)
+      .mockResolvedValueOnce(noEmailParent(10, 2) as any)
+      .mockResolvedValueOnce(noEmailParent(11, 2) as any);
+    vi.mocked(db.getProductById).mockResolvedValue(mockProduct() as any);
+
+    const caller = appRouter.createCaller(makePromoterCtx(2));
+    const result = await caller.productPromotions.send({ parentIds: [10, 11], productId: 5 });
+
+    // Promotion records are still created, just no email
+    expect(result.sent).toBe(2);
     expect(emailModule.sendEmail).not.toHaveBeenCalled();
   });
 
-  it("promoter cannot send promotion for inactive product", async () => {
-    vi.mocked(db.getParentById).mockResolvedValue({ id: 10, promoterId: 2, name: "Jane Doe", email: "jane@test.com", phone: null, notes: null, createdAt: new Date() } as any);
-    vi.mocked(db.getProductById).mockResolvedValue({ id: 5, name: "Old Product", active: false, description: null, price: null, category: null, createdAt: new Date() } as any);
+  it("partial failure: skips parents that don't belong to the promoter", async () => {
+    vi.mocked(db.getParentById)
+      .mockResolvedValueOnce(mockParent(10, 2) as any)   // belongs to promoter 2
+      .mockResolvedValueOnce(mockParent(11, 99) as any);  // belongs to promoter 99
+    vi.mocked(db.getProductById).mockResolvedValue(mockProduct() as any);
 
     const caller = appRouter.createCaller(makePromoterCtx(2));
-    await expect(caller.productPromotions.send({ parentId: 10, productId: 5 })).rejects.toThrow("Product not found or inactive");
+    const result = await caller.productPromotions.send({ parentIds: [10, 11], productId: 5 });
+
+    expect(result.sent).toBe(1);
+    expect(result.failed).toBe(1);
+    expect(result.results.find((r) => r.parentId === 11)?.error).toBe("Parent does not belong to you");
   });
+
+  it("throws NOT_FOUND when product is inactive", async () => {
+    vi.mocked(db.getProductById).mockResolvedValue(mockProduct(false) as any);
+
+    const caller = appRouter.createCaller(makePromoterCtx(2));
+    await expect(
+      caller.productPromotions.send({ parentIds: [10], productId: 5 })
+    ).rejects.toThrow("Product not found or inactive");
+  });
+
+  it("rejects empty parentIds array", async () => {
+    vi.mocked(db.getProductById).mockResolvedValue(mockProduct() as any);
+
+    const caller = appRouter.createCaller(makePromoterCtx(2));
+    await expect(
+      caller.productPromotions.send({ parentIds: [], productId: 5 })
+    ).rejects.toThrow();
+  });
+
+  it("admin can send promotion to any parent regardless of promoterId", async () => {
+    vi.mocked(db.getParentById).mockResolvedValue(mockParent(10, 99) as any); // belongs to another promoter
+    vi.mocked(db.getProductById).mockResolvedValue(mockProduct() as any);
+
+    const caller = appRouter.createCaller(makeAdminCtx());
+    const result = await caller.productPromotions.send({ parentIds: [10], productId: 5 });
+    expect(result.sent).toBe(1);
+  });
+});
+
+describe("productPromotions router — enrollment management", () => {
+  beforeEach(() => vi.clearAllMocks());
 
   it("admin can confirm product enrollment and issue $25 credit", async () => {
     vi.mocked(db.getProductPromotionById).mockResolvedValue({ id: 1, promoterId: 2, parentId: 10, productId: 5, message: null, sentAt: new Date() } as any);

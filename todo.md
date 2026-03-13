@@ -248,3 +248,13 @@
 - [x] Frontend: Send button label updates dynamically ("Send to N Parents")
 - [x] Frontend: disable Send button when no parents selected
 - [x] Vitest tests for multi-parent send (138 passing, emailSmtp excluded from count)
+
+## Admin Referral Link Management
+- [x] Backend: admin.setPromoterReferralToken procedure (custom token or auto-generate)
+- [x] Backend: validate token uniqueness before saving (rejects conflict with other promoters)
+- [x] Backend: validate token format (alphanumeric + hyphens/underscores, 4–32 chars)
+- [x] Frontend: referral link section in Edit Promoter dialog (pre-fills existing token)
+- [x] Frontend: copy-to-clipboard button shows full URL preview
+- [x] Frontend: auto-generate button creates a random 12-char slug
+- [x] Frontend: Save Link button (separate from Save Changes) with inline success/error feedback
+- [x] Vitest tests: 11 tests for setPromoterReferralToken (149 total passing)

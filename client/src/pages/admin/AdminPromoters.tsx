@@ -48,6 +48,11 @@ type PromoterForm = { name: string; email: string };
 type FormErrors = Partial<Record<keyof PromoterForm, string>>;
 const emptyForm: PromoterForm = { name: "", email: "" };
 
+function generateSlug(length = 12): string {
+  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+  return Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+}
+
 function validateForm(form: PromoterForm): FormErrors {
   const errs: FormErrors = {};
   if (!form.name.trim()) errs.name = "Name is required.";
@@ -84,9 +89,14 @@ export default function AdminPromoters() {
   const [createErrors, setCreateErrors] = useState<FormErrors>({});
 
   // ── Edit dialog state ──
-  const [editTarget, setEditTarget] = useState<{ id: number } | null>(null);
+  const [editTarget, setEditTarget] = useState<{ id: number; referralToken?: string | null } | null>(null);
   const [editForm, setEditForm] = useState<PromoterForm>(emptyForm);
   const [editErrors, setEditErrors] = useState<FormErrors>({});
+
+  // ── Referral token edit state ──
+  const [tokenInput, setTokenInput] = useState("");
+  const [tokenError, setTokenError] = useState("");
+  const [tokenSaved, setTokenSaved] = useState(false);
 
   // ── Delete confirmation state ──
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -113,6 +123,19 @@ export default function AdminPromoters() {
     onError: (e) => toast.error(e.message),
   });
 
+  const setTokenMutation = trpc.admin.setPromoterReferralToken.useMutation({
+    onSuccess: (data) => {
+      toast.success("Referral link saved!");
+      setTokenInput(data.token);
+      setTokenSaved(true);
+      utils.admin.listPromoters.invalidate();
+    },
+    onError: (e) => {
+      setTokenError(e.message);
+      toast.error(e.message);
+    },
+  });
+
   const resendInviteMutation = trpc.admin.resendInvite.useMutation({
     onSuccess: () => toast.success("Invitation email resent!"),
     onError: (e) => toast.error(e.message),
@@ -137,10 +160,28 @@ export default function AdminPromoters() {
     createMutation.mutate({ ...createForm, origin: window.location.origin });
   };
 
-  const openEdit = (p: { id: number; name: string | null; email: string | null }) => {
-    setEditTarget({ id: p.id });
+  const openEdit = (p: { id: number; name: string | null; email: string | null; referralToken?: string | null }) => {
+    setEditTarget({ id: p.id, referralToken: p.referralToken });
     setEditForm({ name: p.name ?? "", email: p.email ?? "" });
     setEditErrors({});
+    setTokenInput(p.referralToken ?? "");
+    setTokenError("");
+    setTokenSaved(false);
+  };
+
+  const handleSaveToken = () => {
+    if (!editTarget) return;
+    const val = tokenInput.trim();
+    if (val && !/^[a-zA-Z0-9_-]+$/.test(val)) {
+      setTokenError("Only letters, numbers, hyphens, and underscores are allowed.");
+      return;
+    }
+    if (val && val.length < 4) {
+      setTokenError("Token must be at least 4 characters.");
+      return;
+    }
+    setTokenError("");
+    setTokenMutation.mutate({ promoterId: editTarget.id, token: val || undefined });
   };
 
   const handleUpdate = () => {
@@ -399,12 +440,13 @@ export default function AdminPromoters() {
 
       {/* ── Edit Dialog ── */}
       <Dialog open={!!editTarget} onOpenChange={(open) => !open && setEditTarget(null)}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Edit Promoter</DialogTitle>
-            <DialogDescription>Update the promoter's name or email address.</DialogDescription>
+            <DialogDescription>Update the promoter's name, email address, or referral link.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-2">
+          <div className="space-y-5 py-2">
+            {/* Name */}
             <div className="grid gap-1.5">
               <Label>Full Name <span className="text-destructive">*</span></Label>
               <div className="relative">
@@ -421,6 +463,8 @@ export default function AdminPromoters() {
               </div>
               {editErrors.name && <p className="text-xs text-destructive">{editErrors.name}</p>}
             </div>
+
+            {/* Email */}
             <div className="grid gap-1.5">
               <Label>Email Address <span className="text-destructive">*</span></Label>
               <div className="relative">
@@ -438,6 +482,81 @@ export default function AdminPromoters() {
                 />
               </div>
               {editErrors.email && <p className="text-xs text-destructive">{editErrors.email}</p>}
+            </div>
+
+            {/* Referral Link */}
+            <div className="grid gap-1.5">
+              <div className="flex items-center justify-between">
+                <Label className="flex items-center gap-1.5">
+                  <Link2 className="h-3.5 w-3.5" />
+                  Referral Link Token
+                </Label>
+                <button
+                  type="button"
+                  className="text-xs text-primary hover:underline"
+                  onClick={() => {
+                    const slug = generateSlug();
+                    setTokenInput(slug);
+                    setTokenError("");
+                    setTokenSaved(false);
+                  }}
+                >
+                  Auto-generate
+                </button>
+              </div>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    className="pl-9 font-mono text-sm"
+                    placeholder="e.g. sarah-johnson or abc123xyz"
+                    value={tokenInput}
+                    onChange={(e) => {
+                      setTokenInput(e.target.value);
+                      setTokenError("");
+                      setTokenSaved(false);
+                    }}
+                    onKeyDown={(e) => e.key === "Enter" && handleSaveToken()}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  title="Copy referral link"
+                  disabled={!tokenInput.trim()}
+                  onClick={() => {
+                    const link = `${window.location.origin}/refer/${tokenInput.trim()}`;
+                    navigator.clipboard.writeText(link);
+                    toast.success("Referral link copied!");
+                  }}
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleSaveToken}
+                  disabled={setTokenMutation.isPending}
+                  className="gap-1.5 shrink-0"
+                >
+                  {setTokenMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : tokenSaved ? (
+                    "Saved ✓"
+                  ) : (
+                    "Save Link"
+                  )}
+                </Button>
+              </div>
+              {tokenError && <p className="text-xs text-destructive">{tokenError}</p>}
+              {tokenInput.trim() && !tokenError && (
+                <p className="text-xs text-muted-foreground break-all">
+                  Full URL: {window.location.origin}/refer/{tokenInput.trim()}
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Only letters, numbers, hyphens, and underscores. Min 4, max 32 characters.
+              </p>
             </div>
           </div>
           <DialogFooter>

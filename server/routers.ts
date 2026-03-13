@@ -493,6 +493,53 @@ const adminRouter = router({
       return promoter;
     }),
 
+  setPromoterReferralToken: adminProcedure
+    .input(
+      z.object({
+        promoterId: z.number(),
+        // token is optional: if omitted, a new one is auto-generated
+        token: z
+          .string()
+          .regex(/^[a-zA-Z0-9_-]+$/, "Token may only contain letters, numbers, hyphens, and underscores")
+          .min(4, "Token must be at least 4 characters")
+          .max(32, "Token must be at most 32 characters")
+          .optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const promoter = await getUserById(input.promoterId);
+      if (!promoter || promoter.role !== "promoter")
+        throw new TRPCError({ code: "NOT_FOUND", message: "Promoter not found" });
+
+      let finalToken: string;
+      if (input.token) {
+        // Check uniqueness — reject if another promoter already uses this token
+        const existing = await getUserByReferralToken(input.token);
+        if (existing && existing.id !== input.promoterId) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "This referral token is already in use by another promoter. Please choose a different one.",
+          });
+        }
+        finalToken = input.token;
+      } else {
+        // Auto-generate a unique token
+        const { nanoid } = await import("nanoid");
+        let candidate: string;
+        let attempts = 0;
+        do {
+          candidate = nanoid(16);
+          const conflict = await getUserByReferralToken(candidate);
+          if (!conflict) break;
+          attempts++;
+        } while (attempts < 10);
+        finalToken = candidate!;
+      }
+
+      await setReferralToken(input.promoterId, finalToken);
+      return { success: true, token: finalToken };
+    }),
+
   getStats: adminProcedure.query(async () => {
     const [allPromoters, allParents, allStudents, allReferrals] = await Promise.all([
       getAllPromoters(),

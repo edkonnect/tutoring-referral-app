@@ -43,6 +43,13 @@
       "when": 1773108609227,
       "tag": "0005_pale_invisible_woman",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1773367049016,
+      "tag": "0006_dark_shriek",
+      "breakpoints": true
     }
   ]
 }

@@ -52,6 +52,13 @@ import {
   getProductEnrollmentByPromotionId,
   markProductEnrollmentPaid,
   getPromoterProductEarningsSummary,
+  getAllPromoTemplates,
+  getPromoTemplateById,
+  createPromoTemplate,
+  updatePromoTemplate,
+  deletePromoTemplate,
+  associateTemplateToProduct,
+  getProductWithTemplate,
 } from "./db";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
@@ -726,6 +733,7 @@ const productsRouter = router({
         price: z.string().optional(),
         category: z.string().optional(),
         active: z.boolean().optional(),
+        templateId: z.number().nullable().optional(),
       })
     )
     .mutation(async ({ input }) => {
@@ -770,41 +778,65 @@ const productPromotionsRouter = router({
 
       await sendProductPromotion({ promoterId, parentId: input.parentId, productId: input.productId, message: input.message });
 
-      // Email the parent with product details
+      // Email the parent — use associated template if available, else fall back to default
       if (parent.email) {
         const promoterName = ctx.user.name ?? "Your referrer";
         const priceDisplay = product.price ? `$${parseFloat(product.price).toFixed(2)}` : "Contact us for pricing";
-        const categoryDisplay = product.category ? `<span style="display:inline-block;background:#e0f2fe;color:#0369a1;padding:2px 10px;border-radius:12px;font-size:13px;">${product.category}</span>` : "";
-        const messageSection = input.message
-          ? `<div style="background:#f0fdf4;border-left:4px solid #22c55e;padding:12px 16px;margin:16px 0;border-radius:0 8px 8px 0;">
-              <p style="margin:0;font-style:italic;color:#166534;">&ldquo;${input.message}&rdquo;</p>
-              <p style="margin:6px 0 0;font-size:12px;color:#4ade80;">— ${promoterName}</p>
-             </div>`
-          : "";
-        const descSection = product.description
-          ? `<p style="color:#475569;line-height:1.6;">${product.description}</p>`
-          : "";
 
-        await sendEmail({
-          to: parent.email,
-          subject: `${promoterName} shared a tutoring program with you: ${product.name}`,
-          text: `Hi ${parent.name},\n\n${promoterName} thought you might be interested in our ${product.name} program.\n\n${product.description ?? ""}\n\nPrice: ${priceDisplay}\n\n${input.message ? `Message from ${promoterName}: "${input.message}"` : ""}\n\nPlease contact us to learn more or enroll.`,
-          html: `
-<!DOCTYPE html>
+        // Fetch the product's associated template
+        const productWithTemplate = await getProductWithTemplate(input.productId);
+        const template = productWithTemplate?.template;
+
+        let emailSubject: string;
+        let emailHtml: string;
+        let emailText: string | undefined;
+
+        if (template) {
+          // Interpolate template variables
+          const vars: Record<string, string> = {
+            promoterName,
+            parentName: parent.name,
+            productName: product.name,
+            productPrice: priceDisplay,
+            productDescription: product.description ?? "",
+            productCategory: product.category ?? "",
+            message: input.message ?? "",
+          };
+          const interpolate = (str: string) =>
+            str.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? "");
+
+          emailSubject = interpolate(template.subject);
+          emailHtml = interpolate(template.htmlBody);
+          emailText = template.textBody ? interpolate(template.textBody) : undefined;
+        } else {
+          // Default built-in template
+          const categoryDisplay = product.category
+            ? `<span style="display:inline-block;background:#e0f2fe;color:#0369a1;padding:2px 10px;border-radius:12px;font-size:13px;">${product.category}</span>`
+            : "";
+          const messageSection = input.message
+            ? `<div style="background:#f0fdf4;border-left:4px solid #22c55e;padding:12px 16px;margin:16px 0;border-radius:0 8px 8px 0;">
+                <p style="margin:0;font-style:italic;color:#166534;">&ldquo;${input.message}&rdquo;</p>
+                <p style="margin:6px 0 0;font-size:12px;color:#4ade80;">— ${promoterName}</p>
+               </div>`
+            : "";
+          const descSection = product.description
+            ? `<p style="color:#475569;line-height:1.6;">${product.description}</p>`
+            : "";
+
+          emailSubject = `${promoterName} shared a tutoring program with you: ${product.name}`;
+          emailText = `Hi ${parent.name},\n\n${promoterName} thought you might be interested in our ${product.name} program.\n\n${product.description ?? ""}\n\nPrice: ${priceDisplay}\n\n${input.message ? `Message from ${promoterName}: "${input.message}"` : ""}\n\nPlease contact us to learn more or enroll.`;
+          emailHtml = `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background:#f8fafc;font-family:'Segoe UI',Arial,sans-serif;">
   <div style="max-width:560px;margin:32px auto;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
-    <!-- Header -->
     <div style="background:linear-gradient(135deg,#1e40af,#3b82f6);padding:28px 32px;">
       <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;">A Program Just for You</h1>
       <p style="margin:6px 0 0;color:#bfdbfe;font-size:14px;">${promoterName} thought you'd be interested</p>
     </div>
-    <!-- Body -->
     <div style="padding:28px 32px;">
       <p style="margin:0 0 16px;color:#1e293b;font-size:15px;">Hi <strong>${parent.name}</strong>,</p>
       <p style="margin:0 0 20px;color:#475569;"><strong>${promoterName}</strong> has shared a tutoring program with you that may be a great fit for your family.</p>
-      <!-- Product Card -->
       <div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;margin-bottom:20px;">
         <div style="background:#f1f5f9;padding:16px 20px;border-bottom:1px solid #e2e8f0;">
           <h2 style="margin:0;color:#0f172a;font-size:18px;font-weight:700;">${product.name}</h2>
@@ -812,22 +844,21 @@ const productPromotionsRouter = router({
         </div>
         <div style="padding:16px 20px;">
           ${descSection}
-          <div style="display:flex;align-items:center;gap:8px;margin-top:12px;">
-            <span style="font-size:22px;font-weight:700;color:#1e40af;">${priceDisplay}</span>
-          </div>
+          <div style="margin-top:12px;"><span style="font-size:22px;font-weight:700;color:#1e40af;">${priceDisplay}</span></div>
         </div>
       </div>
       ${messageSection}
       <p style="color:#475569;font-size:14px;">To learn more or enroll your child, please reply to this email or contact us directly.</p>
     </div>
-    <!-- Footer -->
     <div style="background:#f1f5f9;padding:16px 32px;text-align:center;">
       <p style="margin:0;color:#94a3b8;font-size:12px;">You received this email because ${promoterName} referred you to our tutoring program.</p>
     </div>
   </div>
 </body>
-</html>`,
-        });
+</html>`;
+        }
+
+        await sendEmail({ to: parent.email, subject: emailSubject, html: emailHtml, text: emailText });
       }
 
       return { success: true };
@@ -941,6 +972,75 @@ const productPromotionsRouter = router({
   }),
 });
 
+// ─── Promo Templates Router ─────────────────────────────────────────────────
+
+const promoTemplatesRouter = router({
+  // List all templates
+  list: adminProcedure.query(() => getAllPromoTemplates()),
+
+  // Get single template by id
+  getById: adminProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ input }) => {
+      const t = await getPromoTemplateById(input.id);
+      if (!t) throw new TRPCError({ code: "NOT_FOUND", message: "Template not found" });
+      return t;
+    }),
+
+  // Create a new template
+  create: adminProcedure
+    .input(
+      z.object({
+        name: z.string().min(1),
+        subject: z.string().min(1),
+        htmlBody: z.string().min(1),
+        textBody: z.string().optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      await createPromoTemplate(input);
+      return { success: true };
+    }),
+
+  // Update an existing template
+  update: adminProcedure
+    .input(
+      z.object({
+        id: z.number(),
+        name: z.string().min(1).optional(),
+        subject: z.string().min(1).optional(),
+        htmlBody: z.string().min(1).optional(),
+        textBody: z.string().optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const { id, ...data } = input;
+      await updatePromoTemplate(id, data);
+      return { success: true };
+    }),
+
+  // Delete a template (also detaches from products)
+  delete: adminProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      await deletePromoTemplate(input.id);
+      return { success: true };
+    }),
+
+  // Associate a template with a product (or remove association with null)
+  associate: adminProcedure
+    .input(z.object({ productId: z.number(), templateId: z.number().nullable() }))
+    .mutation(async ({ input }) => {
+      await associateTemplateToProduct(input.productId, input.templateId);
+      return { success: true };
+    }),
+
+  // Get a product with its associated template
+  getProductWithTemplate: adminProcedure
+    .input(z.object({ productId: z.number() }))
+    .query(async ({ input }) => getProductWithTemplate(input.productId)),
+});
+
 export const appRouter = router({
   system: systemRouter,
   auth: router({
@@ -960,6 +1060,7 @@ export const appRouter = router({
   invite: inviteRouter,
   products: productsRouter,
   productPromotions: productPromotionsRouter,
+  promoTemplates: promoTemplatesRouter,
 });
 
 export type AppRouter = typeof appRouter;

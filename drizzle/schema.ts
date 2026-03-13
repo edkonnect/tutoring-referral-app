@@ -112,6 +112,20 @@ export const promoterCredentials = mysqlTable("promoter_credentials", {
 export type PromoterCredential = typeof promoterCredentials.$inferSelect;
 export type InsertPromoterCredential = typeof promoterCredentials.$inferInsert;
 
+// Promotional email templates created by admin and associated with products
+export const promoTemplates = mysqlTable("promo_templates", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  subject: varchar("subject", { length: 500 }).notNull(),
+  htmlBody: text("htmlBody").notNull(),
+  textBody: text("textBody"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type PromoTemplate = typeof promoTemplates.$inferSelect;
+export type InsertPromoTemplate = typeof promoTemplates.$inferInsert;
+
 // Products that promoters can promote to parents
 export const products = mysqlTable("products", {
   id: int("id").autoincrement().primaryKey(),
@@ -120,6 +134,7 @@ export const products = mysqlTable("products", {
   price: decimal("price", { precision: 10, scale: 2 }),
   category: varchar("category", { length: 100 }),
   active: boolean("active").default(true).notNull(),
+  templateId: int("templateId"),  // FK to promo_templates.id (nullable)
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

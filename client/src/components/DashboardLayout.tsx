@@ -35,6 +35,7 @@ import {
   CreditCard,
   Package,
   Send,
+  LayoutTemplate,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -50,6 +51,7 @@ const adminMenuItems = [
   { icon: CreditCard, label: "Payouts", path: "/admin/payouts" },
   { icon: Package, label: "Products", path: "/admin/products" },
   { icon: Send, label: "Product Promotions", path: "/admin/product-promotions" },
+  { icon: LayoutTemplate, label: "Promo Templates", path: "/admin/promo-templates" },
 ];
 
 const promoterMenuItems = [

@@ -198,3 +198,32 @@
 - [x] Stats header (total, active, inactive counts)
 - [x] View detail slide-over panel (Sheet) with metadata and quick actions
 - [x] Result count footer on table
+
+## Promotional Email Templates
+### Database
+- [x] promo_templates table (id, name, subject, htmlBody, textBody, createdAt, updatedAt)
+- [x] products table: templateId FK column (nullable, one active template per product)
+
+### Backend API
+- [x] Admin: createTemplate procedure (name, subject, htmlBody, textBody)
+- [x] Admin: updateTemplate procedure
+- [x] Admin: deleteTemplate procedure
+- [x] Admin: listTemplates procedure
+- [x] Admin: getTemplateById procedure
+- [x] Admin: associateTemplate procedure (link template to product)
+- [x] Admin: getProductWithTemplate procedure
+- [x] products.update: accepts templateId to set/clear template association
+- [x] productPromotions.send: use product's associated template when sending email to parent
+- [x] Template variable interpolation: {{promoterName}}, {{parentName}}, {{productName}}, {{productPrice}}, {{productDescription}}, {{productCategory}}, {{message}}
+
+### Admin UI
+- [x] Templates management page (/admin/promo-templates) with list, create, edit, delete
+- [x] Rich template editor with subject line, HTML body (textarea), and variable hints (click-to-copy)
+- [x] Live HTML preview panel (iframe renders template with sample data)
+- [x] Associate template to product (Link2 button on template card → product dropdown)
+- [x] Products page: template selector dropdown in create/edit dialogs
+- [x] Products page: template name shown inline on product rows and in detail sheet
+- [x] Sidebar nav: Promo Templates link added to admin menu
+
+### Tests
+- [x] Vitest tests for template CRUD and association (25 new tests, 123 total passing)

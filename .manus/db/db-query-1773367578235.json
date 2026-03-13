@@ -1,0 +1,46 @@
+{
+  "query": "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE();",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3WQULgVDBb1t2sq.a48dca79cd35 --database MTFTFa6mJvR7VEHb68qsYm --execute SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE();",
+  "rows": [
+    {
+      "TABLE_NAME": "promoter_credentials"
+    },
+    {
+      "TABLE_NAME": "referral_link_visits"
+    },
+    {
+      "TABLE_NAME": "promoter_invites"
+    },
+    {
+      "TABLE_NAME": "product_promotions"
+    },
+    {
+      "TABLE_NAME": "referrals"
+    },
+    {
+      "TABLE_NAME": "students"
+    },
+    {
+      "TABLE_NAME": "users"
+    },
+    {
+      "TABLE_NAME": "promo_templates"
+    },
+    {
+      "TABLE_NAME": "product_enrollments"
+    },
+    {
+      "TABLE_NAME": "__drizzle_migrations"
+    },
+    {
+      "TABLE_NAME": "products"
+    },
+    {
+      "TABLE_NAME": "parents"
+    }
+  ],
+  "messages": [],
+  "stdout": "TABLE_NAME\npromoter_credentials\nreferral_link_visits\npromoter_invites\nproduct_promotions\nreferrals\nstudents\nusers\npromo_templates\nproduct_enrollments\n__drizzle_migrations\nproducts\nparents\n",
+  "stderr": "",
+  "execution_time_ms": 355
+}

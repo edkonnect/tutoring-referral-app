@@ -1,0 +1,9 @@
+{
+  "query": "CREATE TABLE `promo_templates` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`name` varchar(255) NOT NULL,\n\t`subject` varchar(500) NOT NULL,\n\t`htmlBody` text NOT NULL,\n\t`textBody` text,\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\t`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,\n\tCONSTRAINT `promo_templates_id` PRIMARY KEY(`id`)\n);\nALTER TABLE `products` ADD `templateId` int;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3WQULgVDBb1t2sq.a48dca79cd35 --database MTFTFa6mJvR7VEHb68qsYm --execute CREATE TABLE `promo_templates` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`name` varchar(255) NOT NULL,\n\t`subject` varchar(500) NOT NULL,\n\t`htmlBody` text NOT NULL,\n\t`textBody` text,\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\t`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,\n\tCONSTRAINT `promo_templates_id` PRIMARY KEY(`id`)\n);\nALTER TABLE `products` ADD `templateId` int;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 736
+}

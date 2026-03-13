@@ -1,6 +1,6 @@
 import { and, count, desc, eq, gte, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, parents, productEnrollments, productPromotions, products, promoterCredentials, promoterInvites, referralLinkVisits, referrals, students, users } from "../drizzle/schema";
+import { InsertUser, parents, productEnrollments, productPromotions, products, promoTemplates, promoterCredentials, promoterInvites, referralLinkVisits, referrals, students, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -441,7 +441,7 @@ export async function createProduct(data: {
 
 export async function updateProduct(
   id: number,
-  data: { name?: string; description?: string; price?: string; category?: string; active?: boolean }
+  data: { name?: string; description?: string; price?: string; category?: string; active?: boolean; templateId?: number | null }
 ) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -566,4 +566,67 @@ export async function getStudentsByPromoter(promoterId: number) {
   const parentIds = promoterParents.map((p) => p.id);
   const allStudents = await db.select().from(students);
   return allStudents.filter((s) => parentIds.includes(s.parentId));
+}
+
+// ─── Promo Templates ─────────────────────────────────────────────────────────
+
+export async function getAllPromoTemplates() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(promoTemplates).orderBy(desc(promoTemplates.createdAt));
+}
+
+export async function getPromoTemplateById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const rows = await db.select().from(promoTemplates).where(eq(promoTemplates.id, id)).limit(1);
+  return rows[0];
+}
+
+export async function createPromoTemplate(data: {
+  name: string;
+  subject: string;
+  htmlBody: string;
+  textBody?: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(promoTemplates).values(data);
+  return result[0];
+}
+
+export async function updatePromoTemplate(
+  id: number,
+  data: Partial<{ name: string; subject: string; htmlBody: string; textBody: string }>
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(promoTemplates).set(data).where(eq(promoTemplates.id, id));
+}
+
+export async function deletePromoTemplate(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  // Detach from any products first
+  await db.update(products).set({ templateId: null }).where(eq(products.templateId, id));
+  await db.delete(promoTemplates).where(eq(promoTemplates.id, id));
+}
+
+export async function associateTemplateToProduct(productId: number, templateId: number | null) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(products).set({ templateId }).where(eq(products.id, productId));
+}
+
+export async function getProductWithTemplate(productId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const rows = await db.select().from(products).where(eq(products.id, productId)).limit(1);
+  if (!rows[0]) return undefined;
+  const product = rows[0];
+  let template = undefined;
+  if (product.templateId) {
+    template = await getPromoTemplateById(product.templateId);
+  }
+  return { ...product, template };
 }

@@ -12,10 +12,17 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import {
   Plus, Pencil, Trash2, Package, DollarSign, Tag, Loader2, Search,
-  CheckCircle, XCircle, BarChart2, Eye, ChevronRight,
+  CheckCircle, XCircle, BarChart2, Eye, ChevronRight, LayoutTemplate,
 } from "lucide-react";
 
 type ProductForm = {
@@ -24,9 +31,10 @@ type ProductForm = {
   price: string;
   category: string;
   active: boolean;
+  templateId: number | null;
 };
 
-const EMPTY_FORM: ProductForm = { name: "", description: "", price: "", category: "", active: true };
+const EMPTY_FORM: ProductForm = { name: "", description: "", price: "", category: "", active: true, templateId: null };
 
 type Product = {
   id: number;
@@ -35,6 +43,7 @@ type Product = {
   price: string | null;
   category: string | null;
   active: boolean;
+  templateId: number | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -42,6 +51,7 @@ type Product = {
 export default function AdminProducts() {
   const utils = trpc.useUtils();
   const { data: products = [], isLoading } = trpc.products.listAll.useQuery();
+  const { data: templates = [] } = trpc.promoTemplates.list.useQuery();
 
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -124,6 +134,7 @@ export default function AdminProducts() {
       price: p.price ?? "",
       category: p.category ?? "",
       active: p.active,
+      templateId: p.templateId ?? null,
     });
   }
 
@@ -276,6 +287,12 @@ export default function AdminProducts() {
                         {product.description && (
                           <p className="text-xs text-gray-400 mt-0.5 line-clamp-1 max-w-xs">{product.description}</p>
                         )}
+                        {product.templateId && (
+                          <span className="inline-flex items-center gap-1 text-xs text-blue-600 mt-0.5">
+                            <LayoutTemplate className="w-3 h-3" />
+                            {templates.find((t) => t.id === product.templateId)?.name ?? "Custom template"}
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="px-4 py-3">
@@ -361,7 +378,7 @@ export default function AdminProducts() {
               <Package className="w-5 h-5 text-blue-600" /> Add Product
             </DialogTitle>
           </DialogHeader>
-          <ProductFormFields form={form} onChange={setForm} />
+          <ProductFormFields form={form} onChange={setForm} templates={templates} />
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateDialog(false)}>Cancel</Button>
             <Button
@@ -397,6 +414,7 @@ export default function AdminProducts() {
                 form={editProduct}
                 onChange={(f) => setEditProduct({ ...editProduct, ...f })}
                 showActive
+                templates={templates}
               />
               <DialogFooter>
                 <Button variant="outline" onClick={() => setEditProduct(null)}>Cancel</Button>
@@ -409,6 +427,7 @@ export default function AdminProducts() {
                       price: editProduct.price || undefined,
                       category: editProduct.category || undefined,
                       active: editProduct.active,
+                      templateId: editProduct.templateId ?? null,
                     })
                   }
                   disabled={!editProduct.name.trim() || updateMutation.isPending}
@@ -497,6 +516,21 @@ export default function AdminProducts() {
                   </div>
                 )}
 
+                {/* Template */}
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center">
+                    <LayoutTemplate className="w-4 h-4 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Promo Template</p>
+                    <p className="font-semibold text-gray-900 text-sm">
+                      {viewProduct.templateId
+                        ? (templates.find((t) => t.id === viewProduct.templateId)?.name ?? "Custom template")
+                        : "Default template"}
+                    </p>
+                  </div>
+                </div>
+
                 <Separator />
 
                 {/* Metadata */}
@@ -549,10 +583,12 @@ function ProductFormFields({
   form,
   onChange,
   showActive = false,
+  templates = [],
 }: {
   form: ProductForm;
   onChange: (f: ProductForm) => void;
   showActive?: boolean;
+  templates?: Array<{ id: number; name: string }>;
 }) {
   return (
     <div className="space-y-4">
@@ -608,6 +644,30 @@ function ProductFormFields({
             />
           </div>
         </div>
+      </div>
+      {/* Template selector */}
+      <div className="space-y-1.5">
+        <Label htmlFor="product-template" className="flex items-center gap-1.5">
+          <LayoutTemplate className="w-3.5 h-3.5 text-blue-500" />
+          Promo Email Template
+        </Label>
+        <Select
+          value={form.templateId ? String(form.templateId) : "none"}
+          onValueChange={(v) => onChange({ ...form, templateId: v === "none" ? null : parseInt(v) })}
+        >
+          <SelectTrigger id="product-template">
+            <SelectValue placeholder="Use default template" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">Use default template</SelectItem>
+            {templates.map((t) => (
+              <SelectItem key={t.id} value={String(t.id)}>
+                {t.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-gray-400">When a promoter sends this product, this template is used for the email.</p>
       </div>
       {showActive && (
         <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-50">

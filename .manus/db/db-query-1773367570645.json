@@ -1,0 +1,19 @@
+{
+  "query": "SHOW TABLES LIKE 'promo%';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3WQULgVDBb1t2sq.a48dca79cd35 --database MTFTFa6mJvR7VEHb68qsYm --execute SHOW TABLES LIKE 'promo%';",
+  "rows": [
+    {
+      "Tables_in_MTFTFa6mJvR7VEHb68qsYm (promo%)": "promo_templates"
+    },
+    {
+      "Tables_in_MTFTFa6mJvR7VEHb68qsYm (promo%)": "promoter_credentials"
+    },
+    {
+      "Tables_in_MTFTFa6mJvR7VEHb68qsYm (promo%)": "promoter_invites"
+    }
+  ],
+  "messages": [],
+  "stdout": "Tables_in_MTFTFa6mJvR7VEHb68qsYm (promo%)\npromo_templates\npromoter_credentials\npromoter_invites\n",
+  "stderr": "",
+  "execution_time_ms": 347
+}

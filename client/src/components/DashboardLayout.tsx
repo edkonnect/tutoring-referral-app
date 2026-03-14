@@ -29,6 +29,7 @@ import {
   LayoutDashboard,
   LogOut,
   PanelLeft,
+  Settings,
   Users,
   UserCheck,
   ClipboardList,
@@ -52,6 +53,7 @@ const adminMenuItems = [
   { icon: Package, label: "Products", path: "/admin/products" },
   { icon: Send, label: "Product Promotions", path: "/admin/product-promotions" },
   { icon: LayoutTemplate, label: "Promo Templates", path: "/admin/promo-templates" },
+  { icon: Settings, label: "Settings", path: "/admin/settings" },
 ];
 
 const promoterMenuItems = [

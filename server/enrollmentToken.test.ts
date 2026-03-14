@@ -54,6 +54,13 @@ vi.mock("./db", async (importOriginal) => {
   return {
     ...actual,
     // Promotion helpers
+  getSetting: vi.fn().mockResolvedValue(50),
+  getAllSettings: vi.fn().mockResolvedValue({ referralFee: "50.00", productReferralFee: "25.00" }),
+  upsertSetting: vi.fn().mockResolvedValue(undefined),
+  SETTING_KEYS: {
+    referralFee: "referralFee",
+    productReferralFee: "productReferralFee",
+  },
     sendProductPromotion: vi.fn().mockResolvedValue({ insertId: 42 }),
     getPromotionByEnrollmentToken: vi.fn().mockImplementation(async (token: string) => {
       if (token === "test-token-abc123") return mockPromotion;
@@ -217,6 +224,7 @@ describe("productPromotions.selfEnroll (public)", () => {
       promoterId: 1,
       parentId: 10,
       productId: 5,
+      creditAmount: "50.00",
     });
   });
 

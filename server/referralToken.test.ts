@@ -8,6 +8,13 @@ vi.mock("./db", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./db")>();
   return {
     ...actual,
+  getSetting: vi.fn().mockResolvedValue(50),
+  getAllSettings: vi.fn().mockResolvedValue({ referralFee: "50.00", productReferralFee: "25.00" }),
+  upsertSetting: vi.fn().mockResolvedValue(undefined),
+  SETTING_KEYS: {
+    referralFee: "referralFee",
+    productReferralFee: "productReferralFee",
+  },
     getUserById: vi.fn(),
     getUserByReferralToken: vi.fn(),
     setReferralToken: vi.fn(),

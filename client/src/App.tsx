@@ -16,6 +16,7 @@ import AdminPayouts from "./pages/admin/AdminPayouts";
 import AdminProducts from "./pages/admin/AdminProducts";
 import AdminProductPromotions from "./pages/admin/AdminProductPromotions";
 import AdminPromoTemplates from "./pages/admin/AdminPromoTemplates";
+import AdminSettings from "./pages/admin/AdminSettings";
 
 // Promoter pages
 import PromoterDashboard from "./pages/promoter/PromoterDashboard";
@@ -47,6 +48,7 @@ function Router() {
       <Route path="/admin/products" component={AdminProducts} />
       <Route path="/admin/product-promotions" component={AdminProductPromotions} />
       <Route path="/admin/promo-templates" component={AdminPromoTemplates} />
+      <Route path="/admin/settings" component={AdminSettings} />
 
       {/* Promoter routes */}
       <Route path="/promoter" component={PromoterDashboard} />

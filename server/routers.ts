@@ -60,6 +60,10 @@ import {
   associateTemplateToProduct,
   getProductWithTemplate,
   getPromotionByEnrollmentToken,
+  getAllSettings,
+  upsertSetting,
+  getSetting,
+  SETTING_KEYS,
 } from "./db";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
@@ -224,7 +228,7 @@ const studentsRouter = router({
       return { success: true };
     }),
 
-  // Admin-only: confirm enrollment and trigger $50 credit + email
+  // Admin-only: confirm enrollment and trigger referral credit + email
   enroll: adminProcedure
     .input(z.object({ studentId: z.number() }))
     .mutation(async ({ input }) => {
@@ -234,18 +238,19 @@ const studentsRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "Student is already enrolled" });
       }
 
-      const parent = await getParentById(student.parentId);
+       const parent = await getParentById(student.parentId);
       if (!parent) throw new TRPCError({ code: "NOT_FOUND", message: "Parent not found" });
-
+      // Fetch current referral fee from settings
+      const referralFee = await getSetting(SETTING_KEYS.referralFee);
       // Mark student as enrolled
       await enrollStudent(student.id);
-
-      // Create referral credit record
+      // Create referral credit record (creditAmount stored for historical accuracy)
       await createReferral({
         promoterId: parent.promoterId,
         parentId: parent.id,
         studentId: student.id,
-      });
+        creditAmount: referralFee.toFixed(2),
+      });;
 
       // Fetch promoter info for email
       const promoter = await getUserById(parent.promoterId);
@@ -255,7 +260,7 @@ const studentsRouter = router({
         try {
           await sendEmail({
             to: promoter.email,
-            subject: `Great news! Your referral earned you $50 — ${student.name} is now enrolled`,
+            subject: `Great news! Your referral earned you $${referralFee.toFixed(2)} — ${student.name} is now enrolled`,
             html: `
               <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
                 <div style="background: #1e40af; padding: 24px; border-radius: 8px 8px 0 0; text-align: center;">
@@ -266,12 +271,12 @@ const studentsRouter = router({
                   <p style="font-size: 16px;">Congratulations! Your referral has been confirmed. <strong>${student.name}</strong> has been enrolled in our tutoring program.</p>
                   <div style="background: #dbeafe; border: 1px solid #93c5fd; border-radius: 8px; padding: 16px; margin: 20px 0; text-align: center;">
                     <p style="margin: 0; font-size: 14px; color: #1e40af;">Referral Credit</p>
-                    <p style="margin: 8px 0 0; font-size: 36px; font-weight: bold; color: #1e40af;">$50.00</p>
+                    <p style="margin: 8px 0 0; font-size: 36px; font-weight: bold; color: #1e40af;">$${referralFee.toFixed(2)}</p>
                     <p style="margin: 4px 0 0; font-size: 12px; color: #3b82f6;">Status: Pending Payout</p>
                   </div>
                   <p style="font-size: 14px; color: #6b7280;">Parent referred: <strong>${parent.name}</strong></p>
                   <p style="font-size: 14px; color: #6b7280;">Student enrolled: <strong>${student.name}</strong></p>
-                  <p style="font-size: 14px; color: #6b7280;">Your $50 referral fee will be processed shortly. You can track your earnings in your promoter dashboard.</p>
+                  <p style="font-size: 14px; color: #6b7280;">Your $${referralFee.toFixed(2)} referral fee will be processed shortly. You can track your earnings in your promoter dashboard.</p>
                   <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;" />
                   <p style="font-size: 12px; color: #9ca3af; text-align: center;">Tutoring Referral Manager &mdash; Thank you for growing our community!</p>
                 </div>
@@ -550,6 +555,7 @@ const adminRouter = router({
     const enrolled = allStudents.filter((s) => s.enrolled).length;
     const pendingReferrals = allReferrals.filter((r) => r.status === "pending").length;
     const paidReferrals = allReferrals.filter((r) => r.status === "paid").length;
+    const referralFee = await getSetting(SETTING_KEYS.referralFee);
     return {
       totalPromoters: allPromoters.length,
       totalParents: allParents.length,
@@ -557,13 +563,40 @@ const adminRouter = router({
       enrolledStudents: enrolled,
       pendingReferrals,
       paidReferrals,
-      totalCreditsIssued: allReferrals.length * 50,
-      pendingPayouts: pendingReferrals * 50,
+      referralFee,
+      totalCreditsIssued: allReferrals.length * referralFee,
+      pendingPayouts: pendingReferrals * referralFee,
     };
   }),
-});
 
-// ─── Referral Link Router ────────────────────────────────────────────────────
+  // ── Settings ──
+  getSettings: adminProcedure.query(async () => {
+    return getAllSettings();
+  }),
+
+  updateReferralFee: adminProcedure
+    .input(
+      z.object({
+        fee: z.number().positive("Fee must be a positive number").max(10000, "Fee cannot exceed $10,000"),
+      })
+    )
+    .mutation(async ({ input }) => {
+      await upsertSetting(SETTING_KEYS.referralFee, input.fee.toFixed(2));
+      return { success: true, fee: input.fee };
+    }),
+
+  updateProductReferralFee: adminProcedure
+    .input(
+      z.object({
+        fee: z.number().positive("Fee must be a positive number").max(10000, "Fee cannot exceed $10,000"),
+      })
+    )
+    .mutation(async ({ input }) => {
+      await upsertSetting(SETTING_KEYS.productReferralFee, input.fee.toFixed(2));
+      return { success: true, fee: input.fee };
+    }),
+});
+// ─── Referral Link Router ──────────────────────────────────────────────────────────────
 
 const referralLinkRouter = router({
   // Get or generate a referral token for the logged-in promoter
@@ -969,47 +1002,45 @@ const productPromotionsRouter = router({
     return enriched;
   }),
 
-  // Admin confirms a parent enrolled in a promoted product → $25 credit
+  // Admin confirms a parent enrolled in a promoted product → dynamic credit
   confirmEnrollment: adminProcedure
     .input(z.object({ promotionId: z.number() }))
     .mutation(async ({ input }) => {
       const promotion = await getProductPromotionById(input.promotionId);
       if (!promotion) throw new TRPCError({ code: "NOT_FOUND", message: "Promotion not found" });
-
       // Check not already enrolled
       const existing = await getProductEnrollmentByPromotionId(input.promotionId);
       if (existing) throw new TRPCError({ code: "CONFLICT", message: "Already enrolled for this promotion" });
-
-      // Create the $25 credit record
+      // Fetch current product referral fee from settings
+      const productFee = await getSetting(SETTING_KEYS.productReferralFee);
+      // Create the credit record
       await confirmProductEnrollment({
         promotionId: promotion.id,
         promoterId: promotion.promoterId,
         parentId: promotion.parentId,
         productId: promotion.productId,
+        creditAmount: productFee.toFixed(2),
       });
-
       // Notify the promoter via email
       const [promoter, product, parent] = await Promise.all([
         getUserById(promotion.promoterId),
         getProductById(promotion.productId),
         getParentById(promotion.parentId),
       ]);
-
       if (promoter?.email && product && parent) {
         await sendEmail({
           to: promoter.email,
-          subject: `🎉 Product Enrollment Confirmed — $25 Credit Earned!`,
+          subject: `🎉 Product Enrollment Confirmed — $${productFee.toFixed(2)} Credit Earned!`,
           html: `
             <div style="font-family:sans-serif;max-width:600px;margin:0 auto;">
               <h2 style="color:#2563eb;">Great news, ${promoter.name || "Promoter"}!</h2>
               <p>Your referred parent <strong>${parent.name}</strong> has enrolled in <strong>${product.name}</strong>.</p>
-              <p>A <strong>$25.00 referral credit</strong> has been added to your account.</p>
+              <p>A <strong>$${productFee.toFixed(2)} referral credit</strong> has been added to your account.</p>
               <p style="color:#6b7280;font-size:0.875rem;">Log in to your dashboard to view your earnings and payout status.</p>
             </div>
           `,
         });
       }
-
       return { success: true };
     }),
 
@@ -1071,24 +1102,24 @@ const productPromotionsRouter = router({
       const existing = await getProductEnrollmentByPromotionId(promotion.id);
       if (existing) throw new TRPCError({ code: "CONFLICT", message: "You have already enrolled in this program" });
 
-      // Update parent info if provided (they may have a different name/email)
+       // Update parent info if provided (they may have a different name/email)
       await updateParent(promotion.parentId, { name: input.parentName, email: input.parentEmail });
-
-      // Create the enrollment record ($25 credit for promoter)
+      // Fetch current product referral fee from settings
+      const productFee = await getSetting(SETTING_KEYS.productReferralFee);
+      // Create the enrollment record (dynamic credit for promoter)
       await confirmProductEnrollment({
         promotionId: promotion.id,
         promoterId: promotion.promoterId,
         parentId: promotion.parentId,
         productId: promotion.productId,
+        creditAmount: productFee.toFixed(2),
       });
-
       // Notify the promoter
       const [promoter, product, parent] = await Promise.all([
         getUserById(promotion.promoterId),
         getProductById(promotion.productId),
         getParentById(promotion.parentId),
       ]);
-
       if (promoter?.email && product && parent) {
         try {
           await sendEmail({
@@ -1098,17 +1129,16 @@ const productPromotionsRouter = router({
               <div style="font-family:sans-serif;max-width:600px;margin:0 auto;">
                 <h2 style="color:#2563eb;">Great news, ${promoter.name || "Promoter"}!</h2>
                 <p><strong>${input.parentName}</strong> has enrolled in <strong>${product.name}</strong> using your referral link.</p>
-                <p>A <strong>$25.00 referral credit</strong> has been added to your account.</p>
+                <p>A <strong>$${productFee.toFixed(2)} referral credit</strong> has been added to your account.</p>
                 <p style="color:#6b7280;font-size:0.875rem;">Log in to your dashboard to view your earnings and payout status.</p>
               </div>
             `,
-            text: `Great news! ${input.parentName} has enrolled in ${product.name} using your referral link. A $25.00 referral credit has been added to your account.`,
+            text: `Great news! ${input.parentName} has enrolled in ${product.name} using your referral link. A $${productFee.toFixed(2)} referral credit has been added to your account.`,
           });
         } catch (err) {
           console.error("[Email] Failed to notify promoter on self-enrollment:", err);
         }
       }
-
       return { success: true };
     }),
 

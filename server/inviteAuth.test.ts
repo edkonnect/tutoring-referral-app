@@ -9,7 +9,14 @@ vi.mock("./db", async (importOriginal) => {
   return {
     ...actual,
     createPromoter: vi.fn().mockResolvedValue(undefined),
-    getAllPromoters: vi.fn().mockResolvedValue([
+    getSetting: vi.fn().mockResolvedValue(50),
+  getAllSettings: vi.fn().mockResolvedValue({ referralFee: "50.00", productReferralFee: "25.00" }),
+  upsertSetting: vi.fn().mockResolvedValue(undefined),
+  SETTING_KEYS: {
+    referralFee: "referralFee",
+    productReferralFee: "productReferralFee",
+  },
+  getAllPromoters: vi.fn().mockResolvedValue([
       { id: 10, name: "Jane Doe", email: "jane@example.com", role: "promoter", openId: "jane-open-id", referralToken: null, createdAt: new Date() },
     ]),
     getUserById: vi.fn().mockImplementation(async (id: number) => {

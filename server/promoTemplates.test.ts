@@ -29,6 +29,13 @@ vi.mock("./db", async (importOriginal) => {
 
   return {
     ...actual,
+  getSetting: vi.fn().mockResolvedValue(50),
+  getAllSettings: vi.fn().mockResolvedValue({ referralFee: "50.00", productReferralFee: "25.00" }),
+  upsertSetting: vi.fn().mockResolvedValue(undefined),
+  SETTING_KEYS: {
+    referralFee: "referralFee",
+    productReferralFee: "productReferralFee",
+  },
     getAllPromoTemplates: vi.fn().mockResolvedValue([t1, t2]),
     getPromoTemplateById: vi.fn().mockImplementation(async (id: number) => {
       if (id === 1) return t1;

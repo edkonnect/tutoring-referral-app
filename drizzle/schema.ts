@@ -174,3 +174,16 @@ export const productEnrollments = mysqlTable("product_enrollments", {
 
 export type ProductEnrollment = typeof productEnrollments.$inferSelect;
 export type InsertProductEnrollment = typeof productEnrollments.$inferInsert;
+
+// ─── App Settings ─────────────────────────────────────────────────────────────
+// Key-value store for admin-configurable settings.
+// Known keys:
+//   referralFee        – credit (USD) issued per enrolled student via referral link
+//   productReferralFee – credit (USD) issued per enrolled parent via product promotion
+export const appSettings = mysqlTable("app_settings", {
+  key: varchar("key", { length: 64 }).primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type AppSetting = typeof appSettings.$inferSelect;
+export type InsertAppSetting = typeof appSettings.$inferInsert;

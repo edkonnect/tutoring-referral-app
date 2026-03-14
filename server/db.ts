@@ -1,6 +1,6 @@
 import { and, count, desc, eq, gte, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, parents, productEnrollments, productPromotions, products, promoTemplates, promoterCredentials, promoterInvites, referralLinkVisits, referrals, students, users } from "../drizzle/schema";
+import { InsertUser, appSettings, parents, productEnrollments, productPromotions, products, promoTemplates, promoterCredentials, promoterInvites, referralLinkVisits, referrals, students, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -242,10 +242,11 @@ export async function createReferral(data: {
   promoterId: number;
   parentId: number;
   studentId: number;
+  creditAmount?: string;
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  await db.insert(referrals).values({ ...data, creditAmount: "50.00", status: "pending" });
+  await db.insert(referrals).values({ ...data, creditAmount: data.creditAmount ?? "50.00", status: "pending" });
 }
 
 export async function markReferralPaid(id: number) {
@@ -258,12 +259,13 @@ export async function getPromoterEarningsSummary(promoterId: number) {
   const db = await getDb();
   if (!db) return { total: 0, pending: 0, paid: 0, count: 0 };
   const all = await db.select().from(referrals).where(eq(referrals.promoterId, promoterId));
-  const pending = all.filter((r) => r.status === "pending").length;
-  const paid = all.filter((r) => r.status === "paid").length;
+  const pendingRows = all.filter((r) => r.status === "pending");
+  const paidRows = all.filter((r) => r.status === "paid");
+  const toNum = (v: string | null | undefined) => parseFloat(v ?? "0") || 0;
   return {
-    total: all.length * 50,
-    pending: pending * 50,
-    paid: paid * 50,
+    total: all.reduce((s, r) => s + toNum(r.creditAmount), 0),
+    pending: pendingRows.reduce((s, r) => s + toNum(r.creditAmount), 0),
+    paid: paidRows.reduce((s, r) => s + toNum(r.creditAmount), 0),
     count: all.length,
   };
 }
@@ -510,10 +512,11 @@ export async function confirmProductEnrollment(data: {
   promoterId: number;
   parentId: number;
   productId: number;
+  creditAmount?: string;
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  await db.insert(productEnrollments).values({ ...data, creditAmount: "25.00", status: "pending" });
+  await db.insert(productEnrollments).values({ ...data, creditAmount: data.creditAmount ?? "25.00", status: "pending" });
 }
 
 export async function getProductEnrollmentsByPromoter(promoterId: number) {
@@ -559,12 +562,13 @@ export async function getPromoterProductEarningsSummary(promoterId: number) {
     .select()
     .from(productEnrollments)
     .where(eq(productEnrollments.promoterId, promoterId));
-  const pending = all.filter((e) => e.status === "pending").length;
-  const paid = all.filter((e) => e.status === "paid").length;
+  const pendingRows = all.filter((e) => e.status === "pending");
+  const paidRows = all.filter((e) => e.status === "paid");
+  const toNum = (v: string | null | undefined) => parseFloat(v ?? "0") || 0;
   return {
-    total: all.length * 25,
-    pending: pending * 25,
-    paid: paid * 25,
+    total: all.reduce((s, e) => s + toNum(e.creditAmount), 0),
+    pending: pendingRows.reduce((s, e) => s + toNum(e.creditAmount), 0),
+    paid: paidRows.reduce((s, e) => s + toNum(e.creditAmount), 0),
     count: all.length,
   };
 }
@@ -641,4 +645,37 @@ export async function getProductWithTemplate(productId: number) {
     template = await getPromoTemplateById(product.templateId);
   }
   return { ...product, template };
+}
+
+// ─── App Settings ─────────────────────────────────────────────────────────────
+
+export const SETTING_KEYS = {
+  referralFee: "referralFee",
+  productReferralFee: "productReferralFee",
+} as const;
+
+export type SettingKey = (typeof SETTING_KEYS)[keyof typeof SETTING_KEYS];
+
+export async function getSetting(key: SettingKey): Promise<number> {
+  const db = await getDb();
+  if (!db) return key === "referralFee" ? 50 : 25; // safe defaults if DB unavailable
+  const rows = await db.select().from(appSettings).where(eq(appSettings.key, key)).limit(1);
+  if (!rows[0]) return key === "referralFee" ? 50 : 25;
+  return parseFloat(rows[0].value);
+}
+
+export async function getAllSettings(): Promise<Record<string, string>> {
+  const db = await getDb();
+  if (!db) return { referralFee: "50", productReferralFee: "25" };
+  const rows = await db.select().from(appSettings);
+  return Object.fromEntries(rows.map((r) => [r.key, r.value]));
+}
+
+export async function upsertSetting(key: SettingKey, value: string): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db
+    .insert(appSettings)
+    .values({ key, value })
+    .onDuplicateKeyUpdate({ set: { value } });
 }

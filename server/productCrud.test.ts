@@ -7,6 +7,13 @@ vi.mock("./db", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./db")>();
   return {
     ...actual,
+  getSetting: vi.fn().mockResolvedValue(50),
+  getAllSettings: vi.fn().mockResolvedValue({ referralFee: "50.00", productReferralFee: "25.00" }),
+  upsertSetting: vi.fn().mockResolvedValue(undefined),
+  SETTING_KEYS: {
+    referralFee: "referralFee",
+    productReferralFee: "productReferralFee",
+  },
     getAllProducts: vi.fn().mockResolvedValue([
       { id: 1, name: "Math Tutoring", description: "Advanced math", price: "120.00", category: "Math", active: true, createdAt: new Date(), updatedAt: new Date() },
       { id: 2, name: "Science Lab", description: null, price: null, category: "Science", active: false, createdAt: new Date(), updatedAt: new Date() },

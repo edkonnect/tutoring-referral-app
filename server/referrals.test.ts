@@ -6,6 +6,13 @@ import type { TrpcContext } from "./_core/context";
 // ─── Mock DB helpers ──────────────────────────────────────────────────────────
 
 vi.mock("./db", () => ({
+  getSetting: vi.fn().mockResolvedValue(50),
+  getAllSettings: vi.fn().mockResolvedValue({ referralFee: "50.00", productReferralFee: "25.00" }),
+  upsertSetting: vi.fn().mockResolvedValue(undefined),
+  SETTING_KEYS: {
+    referralFee: "referralFee",
+    productReferralFee: "productReferralFee",
+  },
   getAllPromoters: vi.fn().mockResolvedValue([]),
   getAllParents: vi.fn().mockResolvedValue([]),
   getAllStudents: vi.fn().mockResolvedValue([]),

@@ -1,0 +1,9 @@
+{
+  "query": "\nCREATE TABLE `app_settings` (\n  `key` varchar(64) NOT NULL,\n  `value` text NOT NULL,\n  `updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,\n  CONSTRAINT `app_settings_key` PRIMARY KEY(`key`)\n);\n\n-- Seed default values\nINSERT INTO `app_settings` (`key`, `value`) VALUES\n  ('referralFee', '50'),\n  ('productReferralFee', '25')\nON DUPLICATE KEY UPDATE `value` = VALUES(`value`);\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3WQULgVDBb1t2sq.a48dca79cd35 --database MTFTFa6mJvR7VEHb68qsYm --execute \nCREATE TABLE `app_settings` (\n  `key` varchar(64) NOT NULL,\n  `value` text NOT NULL,\n  `updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,\n  CONSTRAINT `app_settings_key` PRIMARY KEY(`key`)\n);\n\n-- Seed default values\nINSERT INTO `app_settings` (`key`, `value`) VALUES\n  ('referralFee', '50'),\n  ('productReferralFee', '25')\nON DUPLICATE KEY UPDATE `value` = VALUES(`value`);\n",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 482
+}

@@ -7,6 +7,13 @@ vi.mock("./db", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./db")>();
   return {
     ...actual,
+  getSetting: vi.fn().mockResolvedValue(50),
+  getAllSettings: vi.fn().mockResolvedValue({ referralFee: "50.00", productReferralFee: "25.00" }),
+  upsertSetting: vi.fn().mockResolvedValue(undefined),
+  SETTING_KEYS: {
+    referralFee: "referralFee",
+    productReferralFee: "productReferralFee",
+  },
     getAllProducts: vi.fn(),
     getProductById: vi.fn(),
     createProduct: vi.fn(),
@@ -241,7 +248,7 @@ describe("productPromotions router — enrollment management", () => {
     const caller = appRouter.createCaller(makeAdminCtx());
     const result = await caller.productPromotions.confirmEnrollment({ promotionId: 1 });
     expect(result.success).toBe(true);
-    expect(db.confirmProductEnrollment).toHaveBeenCalledWith({ promotionId: 1, promoterId: 2, parentId: 10, productId: 5 });
+    expect(db.confirmProductEnrollment).toHaveBeenCalledWith({ promotionId: 1, promoterId: 2, parentId: 10, productId: 5, creditAmount: "50.00" });
   });
 
   it("admin cannot confirm enrollment twice for the same promotion", async () => {

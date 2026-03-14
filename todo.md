@@ -258,3 +258,18 @@
 - [x] Frontend: auto-generate button creates a random 12-char slug
 - [x] Frontend: Save Link button (separate from Save Changes) with inline success/error feedback
 - [x] Vitest tests: 11 tests for setPromoterReferralToken (149 total passing)
+
+## Configurable Referral Fee
+- [x] DB: app_settings table (key/value, upsert semantics)
+- [x] DB: seed defaults (referralFee=$50, productReferralFee=$25)
+- [x] Backend: admin.getSettings procedure
+- [x] Backend: admin.updateReferralFee procedure (validates 0.01–10000)
+- [x] Backend: admin.updateProductReferralFee procedure
+- [x] Backend: replace hardcoded $50 in enrollStudent with dynamic getSetting(referralFee)
+- [x] Backend: replace hardcoded $25 in confirmEnrollment with dynamic getSetting(productReferralFee)
+- [x] Backend: replace hardcoded $25 in selfEnroll with dynamic getSetting(productReferralFee)
+- [x] Backend: replace hardcoded multipliers in getPromoterEarningsSummary with stored creditAmount
+- [x] Backend: replace hardcoded multipliers in getPromoterProductEarningsSummary with stored creditAmount
+- [x] Admin UI: Settings page (/admin/settings) with two fee fields and Save buttons
+- [x] Admin UI: Settings nav link in sidebar
+- [x] Vitest tests: 11 tests for settings procedures (162 total passing)

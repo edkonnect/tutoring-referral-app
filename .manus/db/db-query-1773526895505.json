@@ -1,0 +1,9 @@
+{
+  "query": "ALTER TABLE `students` ADD `lastName` varchar(255); ALTER TABLE `students` ADD `educationGoals` text;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3WQULgVDBb1t2sq.a48dca79cd35 --database MTFTFa6mJvR7VEHb68qsYm --execute ALTER TABLE `students` ADD `lastName` varchar(255); ALTER TABLE `students` ADD `educationGoals` text;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 1077
+}

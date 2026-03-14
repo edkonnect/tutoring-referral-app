@@ -44,10 +44,12 @@ export type InsertParent = typeof parents.$inferInsert;
 export const students = mysqlTable("students", {
   id: int("id").autoincrement().primaryKey(),
   parentId: int("parentId").notNull(),
-  name: varchar("name", { length: 255 }).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),   // first name
+  lastName: varchar("lastName", { length: 255 }),     // last name (added for enrollment form)
   age: int("age"),
   gradeLevel: varchar("gradeLevel", { length: 100 }),
   subjects: text("subjects"), // comma-separated list
+  educationGoals: text("educationGoals"),              // parent-provided education goals
   enrolled: boolean("enrolled").default(false).notNull(),
   enrolledAt: timestamp("enrolledAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

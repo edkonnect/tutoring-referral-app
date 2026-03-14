@@ -86,6 +86,16 @@ vi.mock("./db", async (importOriginal) => {
     deleteParent: vi.fn().mockResolvedValue(undefined),
     getAllParents: vi.fn().mockResolvedValue([]),
 
+    // Student helpers
+    createStudent: vi.fn().mockResolvedValue(undefined),
+    updateStudent: vi.fn().mockResolvedValue(undefined),
+    getStudentById: vi.fn().mockResolvedValue(undefined),
+    getStudentsByParent: vi.fn().mockResolvedValue([]),
+    getStudentsByPromoter: vi.fn().mockResolvedValue([]),
+    getAllStudents: vi.fn().mockResolvedValue([]),
+    deleteStudent: vi.fn().mockResolvedValue(undefined),
+    enrollStudent: vi.fn().mockResolvedValue(undefined),
+
     // User helpers
     getUserById: vi.fn().mockResolvedValue(mockPromoter),
 
@@ -201,24 +211,39 @@ describe("productPromotions.selfEnroll (public)", () => {
     vi.mocked(db.confirmProductEnrollment).mockResolvedValue(undefined);
   });
 
-  it("successfully enrolls a parent with valid token", async () => {
+  const validStudentPayload = {
+    token: "test-token-abc123",
+    parentName: "Jane Doe",
+    parentEmail: "jane@example.com",
+    studentFirstName: "Alice",
+    studentLastName: "Doe",
+    gradeLevel: "Grade 5",
+    educationGoals: "Improve math and reading skills for next year.",
+  };
+
+  it("successfully enrolls a parent with valid token and student info", async () => {
     const caller = appRouter.createCaller(publicCtx);
-    const result = await caller.productPromotions.selfEnroll({
-      token: "test-token-abc123",
-      parentName: "Jane Doe",
-      parentEmail: "jane@example.com",
-    });
+    const result = await caller.productPromotions.selfEnroll(validStudentPayload);
     expect(result.success).toBe(true);
+  });
+
+  it("calls createStudent with the submitted student info", async () => {
+    const { createStudent } = await import("./db");
+    const caller = appRouter.createCaller(publicCtx);
+    await caller.productPromotions.selfEnroll(validStudentPayload);
+    expect(vi.mocked(createStudent)).toHaveBeenCalledWith({
+      parentId: 10,
+      name: "Alice",
+      lastName: "Doe",
+      gradeLevel: "Grade 5",
+      educationGoals: "Improve math and reading skills for next year.",
+    });
   });
 
   it("calls confirmProductEnrollment with correct data", async () => {
     const { confirmProductEnrollment } = await import("./db");
     const caller = appRouter.createCaller(publicCtx);
-    await caller.productPromotions.selfEnroll({
-      token: "test-token-abc123",
-      parentName: "Jane Doe",
-      parentEmail: "jane@example.com",
-    });
+    await caller.productPromotions.selfEnroll(validStudentPayload);
     expect(vi.mocked(confirmProductEnrollment)).toHaveBeenCalledWith({
       promotionId: 42,
       promoterId: 1,
@@ -231,25 +256,17 @@ describe("productPromotions.selfEnroll (public)", () => {
   it("calls updateParent with the submitted name and email", async () => {
     const { updateParent } = await import("./db");
     const caller = appRouter.createCaller(publicCtx);
-    await caller.productPromotions.selfEnroll({
-      token: "test-token-abc123",
-      parentName: "Updated Name",
-      parentEmail: "updated@example.com",
-    });
+    await caller.productPromotions.selfEnroll(validStudentPayload);
     expect(vi.mocked(updateParent)).toHaveBeenCalledWith(10, {
-      name: "Updated Name",
-      email: "updated@example.com",
+      name: "Jane Doe",
+      email: "jane@example.com",
     });
   });
 
   it("throws NOT_FOUND for an invalid token", async () => {
     const caller = appRouter.createCaller(publicCtx);
     await expect(
-      caller.productPromotions.selfEnroll({
-        token: "invalid-token",
-        parentName: "Jane",
-        parentEmail: "jane@example.com",
-      })
+      caller.productPromotions.selfEnroll({ ...validStudentPayload, token: "invalid-token" })
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
@@ -260,36 +277,51 @@ describe("productPromotions.selfEnroll (public)", () => {
       creditAmount: "25.00", status: "pending",
       enrolledAt: new Date(), paidAt: null, createdAt: new Date(), updatedAt: new Date(),
     });
-
     const caller = appRouter.createCaller(publicCtx);
     await expect(
-      caller.productPromotions.selfEnroll({
-        token: "test-token-abc123",
-        parentName: "Jane",
-        parentEmail: "jane@example.com",
-      })
+      caller.productPromotions.selfEnroll(validStudentPayload)
     ).rejects.toMatchObject({ code: "CONFLICT" });
   });
 
   it("validates parentName is non-empty", async () => {
     const caller = appRouter.createCaller(publicCtx);
     await expect(
-      caller.productPromotions.selfEnroll({
-        token: "test-token-abc123",
-        parentName: "",
-        parentEmail: "jane@example.com",
-      })
+      caller.productPromotions.selfEnroll({ ...validStudentPayload, parentName: "" })
     ).rejects.toThrow();
   });
 
   it("validates parentEmail is a valid email", async () => {
     const caller = appRouter.createCaller(publicCtx);
     await expect(
-      caller.productPromotions.selfEnroll({
-        token: "test-token-abc123",
-        parentName: "Jane",
-        parentEmail: "not-an-email",
-      })
+      caller.productPromotions.selfEnroll({ ...validStudentPayload, parentEmail: "not-an-email" })
+    ).rejects.toThrow();
+  });
+
+  it("validates studentFirstName is non-empty", async () => {
+    const caller = appRouter.createCaller(publicCtx);
+    await expect(
+      caller.productPromotions.selfEnroll({ ...validStudentPayload, studentFirstName: "" })
+    ).rejects.toThrow();
+  });
+
+  it("validates studentLastName is non-empty", async () => {
+    const caller = appRouter.createCaller(publicCtx);
+    await expect(
+      caller.productPromotions.selfEnroll({ ...validStudentPayload, studentLastName: "" })
+    ).rejects.toThrow();
+  });
+
+  it("validates gradeLevel is non-empty", async () => {
+    const caller = appRouter.createCaller(publicCtx);
+    await expect(
+      caller.productPromotions.selfEnroll({ ...validStudentPayload, gradeLevel: "" })
+    ).rejects.toThrow();
+  });
+
+  it("validates educationGoals has at least 10 characters", async () => {
+    const caller = appRouter.createCaller(publicCtx);
+    await expect(
+      caller.productPromotions.selfEnroll({ ...validStudentPayload, educationGoals: "Too short" })
     ).rejects.toThrow();
   });
 });

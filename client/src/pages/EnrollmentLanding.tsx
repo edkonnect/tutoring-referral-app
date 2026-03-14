@@ -4,8 +4,16 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   GraduationCap,
   CheckCircle2,
@@ -15,7 +23,37 @@ import {
   Tag,
   User,
   Mail,
+  BookOpen,
+  Target,
 } from "lucide-react";
+
+const GRADE_LEVELS = [
+  "Pre-K",
+  "Kindergarten",
+  "Grade 1",
+  "Grade 2",
+  "Grade 3",
+  "Grade 4",
+  "Grade 5",
+  "Grade 6",
+  "Grade 7",
+  "Grade 8",
+  "Grade 9 (Freshman)",
+  "Grade 10 (Sophomore)",
+  "Grade 11 (Junior)",
+  "Grade 12 (Senior)",
+  "College / University",
+  "Adult Learner",
+];
+
+type FieldErrors = {
+  name?: string;
+  email?: string;
+  studentFirstName?: string;
+  studentLastName?: string;
+  gradeLevel?: string;
+  educationGoals?: string;
+};
 
 export default function EnrollmentLanding() {
   const [, params] = useRoute("/enroll/:token");
@@ -26,12 +64,19 @@ export default function EnrollmentLanding() {
     { enabled: !!token, retry: false }
   );
 
+  // Parent fields
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [submitted, setSubmitted] = useState(false);
-  const [fieldErrors, setFieldErrors] = useState<{ name?: string; email?: string }>({});
+  // Student fields
+  const [studentFirstName, setStudentFirstName] = useState("");
+  const [studentLastName, setStudentLastName] = useState("");
+  const [gradeLevel, setGradeLevel] = useState("");
+  const [educationGoals, setEducationGoals] = useState("");
 
-  // Pre-fill from resolved data once loaded
+  const [submitted, setSubmitted] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+
+  // Pre-fill parent info from resolved data once loaded
   const [prefilled, setPrefilled] = useState(false);
   if (data && !prefilled) {
     if (data.parent?.name) setName(data.parent.name);
@@ -43,11 +88,16 @@ export default function EnrollmentLanding() {
     onSuccess: () => setSubmitted(true),
   });
 
-  function validate() {
-    const errors: { name?: string; email?: string } = {};
+  function validate(): boolean {
+    const errors: FieldErrors = {};
     if (!name.trim()) errors.name = "Your name is required.";
     if (!email.trim()) errors.email = "Your email address is required.";
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = "Please enter a valid email address.";
+    if (!studentFirstName.trim()) errors.studentFirstName = "Student's first name is required.";
+    if (!studentLastName.trim()) errors.studentLastName = "Student's last name is required.";
+    if (!gradeLevel) errors.gradeLevel = "Please select the student's grade level.";
+    if (!educationGoals.trim()) errors.educationGoals = "Please describe the education goals.";
+    else if (educationGoals.trim().length < 10) errors.educationGoals = "Please provide at least 10 characters.";
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
   }
@@ -55,7 +105,15 @@ export default function EnrollmentLanding() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!validate()) return;
-    enrollMutation.mutate({ token, parentName: name.trim(), parentEmail: email.trim() });
+    enrollMutation.mutate({
+      token,
+      parentName: name.trim(),
+      parentEmail: email.trim(),
+      studentFirstName: studentFirstName.trim(),
+      studentLastName: studentLastName.trim(),
+      gradeLevel,
+      educationGoals: educationGoals.trim(),
+    });
   }
 
   // ─── Loading state ────────────────────────────────────────────────────────
@@ -127,7 +185,7 @@ export default function EnrollmentLanding() {
 
   // ─── Enrollment form ──────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center p-4 py-10">
       <div className="max-w-lg w-full space-y-6">
         {/* Header */}
         <div className="text-center space-y-2">
@@ -175,38 +233,137 @@ export default function EnrollmentLanding() {
         {/* Enrollment form */}
         <Card className="shadow-md border-0">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base text-gray-800">Confirm Your Details</CardTitle>
-            <p className="text-xs text-gray-400">Please verify your name and email to complete enrollment.</p>
+            <CardTitle className="text-base text-gray-800">Complete Your Registration</CardTitle>
+            <p className="text-xs text-gray-400">All fields are required to complete enrollment.</p>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="enroll-name" className="flex items-center gap-1.5 text-sm">
-                  <User className="w-3.5 h-3.5 text-gray-400" /> Full Name
-                </Label>
-                <Input
-                  id="enroll-name"
-                  value={name}
-                  onChange={(e) => { setName(e.target.value); setFieldErrors((p) => ({ ...p, name: undefined })); }}
-                  placeholder="Your full name"
-                  className={fieldErrors.name ? "border-red-400 focus-visible:ring-red-300" : ""}
-                />
-                {fieldErrors.name && <p className="text-xs text-red-500">{fieldErrors.name}</p>}
+            <form onSubmit={handleSubmit} className="space-y-5">
+
+              {/* ── Parent / Guardian Section ── */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 pb-1 border-b border-gray-100">
+                  <User className="w-4 h-4 text-blue-500" />
+                  <h3 className="text-sm font-semibold text-gray-700">Parent / Guardian Information</h3>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="enroll-name" className="text-sm text-gray-600">
+                    Full Name <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="enroll-name"
+                    value={name}
+                    onChange={(e) => { setName(e.target.value); setFieldErrors((p) => ({ ...p, name: undefined })); }}
+                    placeholder="Your full name"
+                    className={fieldErrors.name ? "border-red-400 focus-visible:ring-red-300" : ""}
+                  />
+                  {fieldErrors.name && <p className="text-xs text-red-500">{fieldErrors.name}</p>}
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="enroll-email" className="text-sm text-gray-600">
+                    Email Address <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="enroll-email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => { setEmail(e.target.value); setFieldErrors((p) => ({ ...p, email: undefined })); }}
+                    placeholder="your@email.com"
+                    className={fieldErrors.email ? "border-red-400 focus-visible:ring-red-300" : ""}
+                  />
+                  {fieldErrors.email && <p className="text-xs text-red-500">{fieldErrors.email}</p>}
+                </div>
               </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="enroll-email" className="flex items-center gap-1.5 text-sm">
-                  <Mail className="w-3.5 h-3.5 text-gray-400" /> Email Address
-                </Label>
-                <Input
-                  id="enroll-email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => { setEmail(e.target.value); setFieldErrors((p) => ({ ...p, email: undefined })); }}
-                  placeholder="your@email.com"
-                  className={fieldErrors.email ? "border-red-400 focus-visible:ring-red-300" : ""}
-                />
-                {fieldErrors.email && <p className="text-xs text-red-500">{fieldErrors.email}</p>}
+              {/* ── Student Section ── */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 pb-1 border-b border-gray-100">
+                  <BookOpen className="w-4 h-4 text-indigo-500" />
+                  <h3 className="text-sm font-semibold text-gray-700">Student Information</h3>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="student-first" className="text-sm text-gray-600">
+                      First Name <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="student-first"
+                      value={studentFirstName}
+                      onChange={(e) => { setStudentFirstName(e.target.value); setFieldErrors((p) => ({ ...p, studentFirstName: undefined })); }}
+                      placeholder="First name"
+                      className={fieldErrors.studentFirstName ? "border-red-400 focus-visible:ring-red-300" : ""}
+                    />
+                    {fieldErrors.studentFirstName && <p className="text-xs text-red-500">{fieldErrors.studentFirstName}</p>}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="student-last" className="text-sm text-gray-600">
+                      Last Name <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="student-last"
+                      value={studentLastName}
+                      onChange={(e) => { setStudentLastName(e.target.value); setFieldErrors((p) => ({ ...p, studentLastName: undefined })); }}
+                      placeholder="Last name"
+                      className={fieldErrors.studentLastName ? "border-red-400 focus-visible:ring-red-300" : ""}
+                    />
+                    {fieldErrors.studentLastName && <p className="text-xs text-red-500">{fieldErrors.studentLastName}</p>}
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="grade-level" className="text-sm text-gray-600">
+                    Grade Level <span className="text-red-500">*</span>
+                  </Label>
+                  <Select
+                    value={gradeLevel}
+                    onValueChange={(v) => { setGradeLevel(v); setFieldErrors((p) => ({ ...p, gradeLevel: undefined })); }}
+                  >
+                    <SelectTrigger
+                      id="grade-level"
+                      className={fieldErrors.gradeLevel ? "border-red-400 focus:ring-red-300" : ""}
+                    >
+                      <SelectValue placeholder="Select grade level…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {GRADE_LEVELS.map((g) => (
+                        <SelectItem key={g} value={g}>{g}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {fieldErrors.gradeLevel && <p className="text-xs text-red-500">{fieldErrors.gradeLevel}</p>}
+                </div>
+              </div>
+
+              {/* ── Education Goals Section ── */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 pb-1 border-b border-gray-100">
+                  <Target className="w-4 h-4 text-green-500" />
+                  <h3 className="text-sm font-semibold text-gray-700">Education Goals</h3>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="education-goals" className="text-sm text-gray-600">
+                    What are your child's education goals? <span className="text-red-500">*</span>
+                  </Label>
+                  <Textarea
+                    id="education-goals"
+                    value={educationGoals}
+                    onChange={(e) => { setEducationGoals(e.target.value); setFieldErrors((p) => ({ ...p, educationGoals: undefined })); }}
+                    placeholder="e.g. Improve math skills, prepare for SAT, build confidence in reading, catch up on missed coursework…"
+                    rows={4}
+                    className={fieldErrors.educationGoals ? "border-red-400 focus-visible:ring-red-300" : ""}
+                  />
+                  <div className="flex justify-between items-center">
+                    {fieldErrors.educationGoals
+                      ? <p className="text-xs text-red-500">{fieldErrors.educationGoals}</p>
+                      : <span />
+                    }
+                    <p className="text-xs text-gray-400 ml-auto">{educationGoals.length} chars</p>
+                  </div>
+                </div>
               </div>
 
               {enrollMutation.error && (
@@ -224,7 +381,7 @@ export default function EnrollmentLanding() {
                 {enrollMutation.isPending ? (
                   <><Loader2 className="w-4 h-4 animate-spin" /> Enrolling…</>
                 ) : (
-                  <><CheckCircle2 className="w-4 h-4" /> Confirm Enrollment</>
+                  <><CheckCircle2 className="w-4 h-4" /> Complete Enrollment</>
                 )}
               </Button>
             </form>

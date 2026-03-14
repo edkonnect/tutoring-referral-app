@@ -183,19 +183,20 @@ export async function getStudentById(id: number) {
 export async function createStudent(data: {
   parentId: number;
   name: string;
+  lastName?: string;
   age?: number;
   gradeLevel?: string;
   subjects?: string;
+  educationGoals?: string;
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   const result = await db.insert(students).values(data);
   return result;
 }
-
 export async function updateStudent(
   id: number,
-  data: { name?: string; age?: number; gradeLevel?: string; subjects?: string }
+  data: { name?: string; lastName?: string; age?: number; gradeLevel?: string; subjects?: string; educationGoals?: string }
 ) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");

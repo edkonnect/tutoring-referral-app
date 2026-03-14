@@ -1098,6 +1098,10 @@ const productPromotionsRouter = router({
       token: z.string(),
       parentName: z.string().min(1, "Name is required"),
       parentEmail: z.string().email("Valid email is required"),
+      studentFirstName: z.string().min(1, "Student first name is required"),
+      studentLastName: z.string().min(1, "Student last name is required"),
+      gradeLevel: z.string().min(1, "Grade level is required"),
+      educationGoals: z.string().min(10, "Please describe the education goals (at least 10 characters)"),
     }))
     .mutation(async ({ input }) => {
       const promotion = await getPromotionByEnrollmentToken(input.token);
@@ -1107,8 +1111,16 @@ const productPromotionsRouter = router({
       const existing = await getProductEnrollmentByPromotionId(promotion.id);
       if (existing) throw new TRPCError({ code: "CONFLICT", message: "You have already enrolled in this program" });
 
-       // Update parent info if provided (they may have a different name/email)
+      // Update parent info
       await updateParent(promotion.parentId, { name: input.parentName, email: input.parentEmail });
+      // Create student record linked to the parent
+      await createStudent({
+        parentId: promotion.parentId,
+        name: input.studentFirstName,
+        lastName: input.studentLastName,
+        gradeLevel: input.gradeLevel,
+        educationGoals: input.educationGoals,
+      });
       // Resolve fee: use product-level override if set, else fall back to global setting
       const enrollProduct = await getProductById(promotion.productId);
       const globalFee = await getSetting(SETTING_KEYS.productReferralFee);

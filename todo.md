@@ -283,3 +283,11 @@
 - [x] Admin UI: add Custom Referral Fee field to Create/Edit Product dialogs
 - [x] Admin UI: show override fee badge on product table rows and detail sheet
 - [x] Vitest tests: 9 new tests for fee override logic (169 total passing)
+
+## Student Info in Enrollment Registration
+- [x] DB: add lastName and educationGoals columns to students table
+- [x] Backend: update selfEnroll to accept studentFirstName, studentLastName, gradeLevel, educationGoals (all mandatory)
+- [x] Backend: create a student record linked to the parent on self-enrollment
+- [x] Frontend: add student info section to EnrollmentLanding page (first name, last name, grade level dropdown, education goals textarea)
+- [x] Frontend: validate all student fields as required before allowing form submission
+- [x] Vitest tests for selfEnroll with student info (176 total passing)

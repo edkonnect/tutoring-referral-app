@@ -798,6 +798,7 @@ const productsRouter = router({
         description: z.string().optional(),
         price: z.string().optional(),
         category: z.string().optional(),
+        referralFeeOverride: z.string().nullable().optional(),
       })
     )
     .mutation(async ({ input }) => {
@@ -815,6 +816,7 @@ const productsRouter = router({
         category: z.string().optional(),
         active: z.boolean().optional(),
         templateId: z.number().nullable().optional(),
+        referralFeeOverride: z.string().nullable().optional(),
       })
     )
     .mutation(async ({ input }) => {
@@ -1011,8 +1013,12 @@ const productPromotionsRouter = router({
       // Check not already enrolled
       const existing = await getProductEnrollmentByPromotionId(input.promotionId);
       if (existing) throw new TRPCError({ code: "CONFLICT", message: "Already enrolled for this promotion" });
-      // Fetch current product referral fee from settings
-      const productFee = await getSetting(SETTING_KEYS.productReferralFee);
+      // Resolve fee: use product-level override if set, else fall back to global setting
+      const product = await getProductById(promotion.productId);
+      const globalProductFee = await getSetting(SETTING_KEYS.productReferralFee);
+      const productFee = product?.referralFeeOverride != null
+        ? parseFloat(product.referralFeeOverride)
+        : globalProductFee;
       // Create the credit record
       await confirmProductEnrollment({
         promotionId: promotion.id,
@@ -1022,19 +1028,18 @@ const productPromotionsRouter = router({
         creditAmount: productFee.toFixed(2),
       });
       // Notify the promoter via email
-      const [promoter, product, parent] = await Promise.all([
+      const [promoter, enrolledParent] = await Promise.all([
         getUserById(promotion.promoterId),
-        getProductById(promotion.productId),
         getParentById(promotion.parentId),
       ]);
-      if (promoter?.email && product && parent) {
+      if (promoter?.email && product && enrolledParent) {
         await sendEmail({
           to: promoter.email,
           subject: `🎉 Product Enrollment Confirmed — $${productFee.toFixed(2)} Credit Earned!`,
           html: `
             <div style="font-family:sans-serif;max-width:600px;margin:0 auto;">
               <h2 style="color:#2563eb;">Great news, ${promoter.name || "Promoter"}!</h2>
-              <p>Your referred parent <strong>${parent.name}</strong> has enrolled in <strong>${product.name}</strong>.</p>
+              <p>Your referred parent <strong>${enrolledParent.name}</strong> has enrolled in <strong>${product.name}</strong>.</p>
               <p>A <strong>$${productFee.toFixed(2)} referral credit</strong> has been added to your account.</p>
               <p style="color:#6b7280;font-size:0.875rem;">Log in to your dashboard to view your earnings and payout status.</p>
             </div>
@@ -1104,8 +1109,12 @@ const productPromotionsRouter = router({
 
        // Update parent info if provided (they may have a different name/email)
       await updateParent(promotion.parentId, { name: input.parentName, email: input.parentEmail });
-      // Fetch current product referral fee from settings
-      const productFee = await getSetting(SETTING_KEYS.productReferralFee);
+      // Resolve fee: use product-level override if set, else fall back to global setting
+      const enrollProduct = await getProductById(promotion.productId);
+      const globalFee = await getSetting(SETTING_KEYS.productReferralFee);
+      const productFee = enrollProduct?.referralFeeOverride != null
+        ? parseFloat(enrollProduct.referralFeeOverride)
+        : globalFee;
       // Create the enrollment record (dynamic credit for promoter)
       await confirmProductEnrollment({
         promotionId: promotion.id,

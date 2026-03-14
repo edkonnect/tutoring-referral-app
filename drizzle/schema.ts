@@ -135,6 +135,7 @@ export const products = mysqlTable("products", {
   category: varchar("category", { length: 100 }),
   active: boolean("active").default(true).notNull(),
   templateId: int("templateId"),  // FK to promo_templates.id (nullable)
+  referralFeeOverride: decimal("referralFeeOverride", { precision: 10, scale: 2 }),  // nullable; overrides global productReferralFee when set
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

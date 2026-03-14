@@ -273,3 +273,13 @@
 - [x] Admin UI: Settings page (/admin/settings) with two fee fields and Save buttons
 - [x] Admin UI: Settings nav link in sidebar
 - [x] Vitest tests: 11 tests for settings procedures (162 total passing)
+
+## Per-Product Referral Fee Override
+- [x] DB: add referralFeeOverride column to products table (decimal, nullable)
+- [x] Backend: update createProduct and updateProduct db helpers to accept referralFeeOverride
+- [x] Backend: update products.create and products.update tRPC procedures to accept referralFeeOverride
+- [x] Backend: update confirmEnrollment to use product.referralFeeOverride if set, else global productReferralFee
+- [x] Backend: update selfEnroll to use product.referralFeeOverride if set, else global productReferralFee
+- [x] Admin UI: add Custom Referral Fee field to Create/Edit Product dialogs
+- [x] Admin UI: show override fee badge on product table rows and detail sheet
+- [x] Vitest tests: 9 new tests for fee override logic (169 total passing)

@@ -1,0 +1,1 @@
+ALTER TABLE `products` ADD `referralFeeOverride` decimal(10,2);

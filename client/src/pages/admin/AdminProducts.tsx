@@ -32,9 +32,10 @@ type ProductForm = {
   category: string;
   active: boolean;
   templateId: number | null;
+  referralFeeOverride: string;
 };
 
-const EMPTY_FORM: ProductForm = { name: "", description: "", price: "", category: "", active: true, templateId: null };
+const EMPTY_FORM: ProductForm = { name: "", description: "", price: "", category: "", active: true, templateId: null, referralFeeOverride: "" };
 
 type Product = {
   id: number;
@@ -44,6 +45,7 @@ type Product = {
   category: string | null;
   active: boolean;
   templateId: number | null;
+  referralFeeOverride: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -135,6 +137,7 @@ export default function AdminProducts() {
       category: p.category ?? "",
       active: p.active,
       templateId: p.templateId ?? null,
+      referralFeeOverride: p.referralFeeOverride ?? "",
     });
   }
 
@@ -306,6 +309,11 @@ export default function AdminProducts() {
                       {product.price
                         ? <span className="flex items-center gap-1"><DollarSign className="w-3 h-3 text-green-600" />{Number(product.price).toFixed(2)}</span>
                         : <span className="text-gray-300">—</span>}
+                      {product.referralFeeOverride != null && (
+                        <span className="flex items-center gap-0.5 text-xs text-amber-600 mt-0.5">
+                          <DollarSign className="w-2.5 h-2.5" />{Number(product.referralFeeOverride).toFixed(2)} fee
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       {product.active ? (
@@ -388,6 +396,7 @@ export default function AdminProducts() {
                   description: form.description || undefined,
                   price: form.price || undefined,
                   category: form.category || undefined,
+                  referralFeeOverride: form.referralFeeOverride || null,
                 })
               }
               disabled={!form.name.trim() || createMutation.isPending}
@@ -428,6 +437,7 @@ export default function AdminProducts() {
                       category: editProduct.category || undefined,
                       active: editProduct.active,
                       templateId: editProduct.templateId ?? null,
+                      referralFeeOverride: editProduct.referralFeeOverride || null,
                     })
                   }
                   disabled={!editProduct.name.trim() || updateMutation.isPending}
@@ -515,6 +525,21 @@ export default function AdminProducts() {
                     <p className="text-sm text-gray-700 leading-relaxed">{viewProduct.description}</p>
                   </div>
                 )}
+
+                {/* Referral Fee Override */}
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-amber-50 flex items-center justify-center">
+                    <DollarSign className="w-4 h-4 text-amber-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Referral Fee</p>
+                    <p className="font-semibold text-gray-900 text-sm">
+                      {viewProduct.referralFeeOverride != null
+                        ? <span className="text-amber-700">${Number(viewProduct.referralFeeOverride).toFixed(2)} <span className="text-xs font-normal text-gray-400">(custom)</span></span>
+                        : <span className="text-gray-400">Uses global default</span>}
+                    </p>
+                  </div>
+                </div>
 
                 {/* Template */}
                 <div className="flex items-center gap-3">
@@ -645,6 +670,28 @@ function ProductFormFields({
           </div>
         </div>
       </div>
+      {/* Referral Fee Override */}
+      <div className="space-y-1.5">
+        <Label htmlFor="product-fee-override" className="flex items-center gap-1.5">
+          <DollarSign className="w-3.5 h-3.5 text-amber-500" />
+          Custom Referral Fee (optional)
+        </Label>
+        <div className="relative">
+          <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+          <Input
+            id="product-fee-override"
+            placeholder="Leave blank to use global default"
+            type="number"
+            min="0"
+            step="0.01"
+            value={form.referralFeeOverride}
+            onChange={(e) => onChange({ ...form, referralFeeOverride: e.target.value })}
+            className="pl-8"
+          />
+        </div>
+        <p className="text-xs text-gray-400">Overrides the global referral fee for this product only. Leave blank to use the default.</p>
+      </div>
+
       {/* Template selector */}
       <div className="space-y-1.5">
         <Label htmlFor="product-template" className="flex items-center gap-1.5">

@@ -434,6 +434,7 @@ export async function createProduct(data: {
   description?: string;
   price?: string;
   category?: string;
+  referralFeeOverride?: string | null;
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -443,7 +444,7 @@ export async function createProduct(data: {
 
 export async function updateProduct(
   id: number,
-  data: { name?: string; description?: string; price?: string; category?: string; active?: boolean; templateId?: number | null }
+  data: { name?: string; description?: string; price?: string; category?: string; active?: boolean; templateId?: number | null; referralFeeOverride?: string | null }
 ) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");

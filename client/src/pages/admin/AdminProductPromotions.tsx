@@ -7,11 +7,32 @@ import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import {
   Send, CheckCircle2, Clock, DollarSign, Search, Loader2, User, Package,
   Banknote, GraduationCap, BookOpen, Target, ChevronRight, AlertCircle,
+  Pencil, X, Save,
 } from "lucide-react";
+
+const GRADE_LEVELS = [
+  "Pre-K", "Kindergarten", "Grade 1", "Grade 2", "Grade 3", "Grade 4",
+  "Grade 5", "Grade 6", "Grade 7", "Grade 8", "Grade 9", "Grade 10",
+  "Grade 11", "Grade 12", "College", "Adult Learner",
+];
+
+type Student = {
+  id: number;
+  name: string;
+  lastName?: string | null;
+  gradeLevel?: string | null;
+  educationGoals?: string | null;
+  subjects?: string | null;
+  enrolled: boolean;
+  createdAt: Date;
+};
 
 type Promotion = {
   id: number;
@@ -31,17 +52,229 @@ type Promotion = {
     enrolledAt: Date;
     paidAt?: Date | null;
   } | null;
-  students?: {
-    id: number;
-    name: string;
-    lastName?: string | null;
-    gradeLevel?: string | null;
-    educationGoals?: string | null;
-    subjects?: string | null;
-    enrolled: boolean;
-    createdAt: Date;
-  }[];
+  students?: Student[];
 };
+
+type StudentEditForm = {
+  name: string;
+  lastName: string;
+  gradeLevel: string;
+  educationGoals: string;
+};
+
+function StudentCard({
+  student,
+  index,
+  total,
+  onSaved,
+}: {
+  student: Student;
+  index: number;
+  total: number;
+  onSaved: () => void;
+}) {
+  const utils = trpc.useUtils();
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState<StudentEditForm>({
+    name: student.name ?? "",
+    lastName: student.lastName ?? "",
+    gradeLevel: student.gradeLevel ?? "",
+    educationGoals: student.educationGoals ?? "",
+  });
+
+  const updateMutation = trpc.students.update.useMutation({
+    onSuccess: () => {
+      toast.success("Student information updated.");
+      setEditing(false);
+      utils.productPromotions.listAll.invalidate();
+      onSaved();
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const handleSave = () => {
+    if (!form.name.trim()) {
+      toast.error("First name is required.");
+      return;
+    }
+    updateMutation.mutate({
+      id: student.id,
+      name: form.name.trim(),
+      lastName: form.lastName.trim() || undefined,
+      gradeLevel: form.gradeLevel || undefined,
+      educationGoals: form.educationGoals.trim() || undefined,
+    });
+  };
+
+  const handleCancel = () => {
+    setForm({
+      name: student.name ?? "",
+      lastName: student.lastName ?? "",
+      gradeLevel: student.gradeLevel ?? "",
+      educationGoals: student.educationGoals ?? "",
+    });
+    setEditing(false);
+  };
+
+  return (
+    <div className="bg-indigo-50 border border-indigo-100 rounded-lg p-4 space-y-3">
+      {total > 1 && (
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-semibold text-indigo-500 uppercase tracking-wide">Student {index + 1}</p>
+          {!editing && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 px-2 text-xs text-indigo-600 hover:bg-indigo-100 gap-1"
+              onClick={() => setEditing(true)}
+            >
+              <Pencil className="w-3 h-3" /> Edit
+            </Button>
+          )}
+        </div>
+      )}
+
+      {total === 1 && !editing && (
+        <div className="flex justify-end">
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-6 px-2 text-xs text-indigo-600 hover:bg-indigo-100 gap-1"
+            onClick={() => setEditing(true)}
+          >
+            <Pencil className="w-3 h-3" /> Edit
+          </Button>
+        </div>
+      )}
+
+      {editing ? (
+        /* ── Edit Mode ── */
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <Label className="text-xs text-gray-600">First Name *</Label>
+              <Input
+                value={form.name}
+                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                placeholder="First name"
+                className="h-8 text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-gray-600">Last Name</Label>
+              <Input
+                value={form.lastName}
+                onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))}
+                placeholder="Last name"
+                className="h-8 text-sm"
+              />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-gray-600">Grade Level</Label>
+            <Select
+              value={form.gradeLevel || "__none__"}
+              onValueChange={(v) => setForm((f) => ({ ...f, gradeLevel: v === "__none__" ? "" : v }))}
+            >
+              <SelectTrigger className="h-8 text-sm">
+                <SelectValue placeholder="Select grade level" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">— Not specified —</SelectItem>
+                {GRADE_LEVELS.map((g) => (
+                  <SelectItem key={g} value={g}>{g}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-gray-600">Education Goals</Label>
+            <Textarea
+              value={form.educationGoals}
+              onChange={(e) => setForm((f) => ({ ...f, educationGoals: e.target.value }))}
+              placeholder="Describe the student's education goals..."
+              className="text-sm min-h-[80px] resize-none"
+            />
+          </div>
+          <div className="flex gap-2 pt-1">
+            <Button
+              size="sm"
+              className="h-7 text-xs gap-1 bg-indigo-600 hover:bg-indigo-700"
+              onClick={handleSave}
+              disabled={updateMutation.isPending}
+            >
+              {updateMutation.isPending ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : (
+                <Save className="w-3 h-3" />
+              )}
+              Save
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 text-xs gap-1 text-gray-500"
+              onClick={handleCancel}
+              disabled={updateMutation.isPending}
+            >
+              <X className="w-3 h-3" /> Cancel
+            </Button>
+          </div>
+        </div>
+      ) : (
+        /* ── View Mode ── */
+        <div className="space-y-2.5">
+          <div className="flex items-center gap-2">
+            <User className="w-4 h-4 text-indigo-400 shrink-0" />
+            <div>
+              <p className="text-xs text-gray-500">Full Name</p>
+              <p className="font-semibold text-gray-900">
+                {student.name}{student.lastName ? ` ${student.lastName}` : ""}
+              </p>
+            </div>
+          </div>
+          {student.gradeLevel ? (
+            <div className="flex items-center gap-2">
+              <BookOpen className="w-4 h-4 text-indigo-400 shrink-0" />
+              <div>
+                <p className="text-xs text-gray-500">Grade Level</p>
+                <p className="text-sm text-gray-800">{student.gradeLevel}</p>
+              </div>
+            </div>
+          ) : (
+            <p className="text-xs text-gray-400 flex items-center gap-1 pl-6">
+              <span className="italic">No grade level set</span>
+            </p>
+          )}
+          {student.educationGoals ? (
+            <div className="flex items-start gap-2">
+              <Target className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs text-gray-500">Education Goals</p>
+                <p className="text-sm text-gray-800 leading-relaxed">{student.educationGoals}</p>
+              </div>
+            </div>
+          ) : (
+            <p className="text-xs text-gray-400 flex items-center gap-1 pl-6">
+              <span className="italic">No education goals set</span>
+            </p>
+          )}
+          <div className="flex items-center gap-1.5 pt-1">
+            {student.enrolled ? (
+              <Badge className="bg-green-100 text-green-700 border-0 text-xs gap-1">
+                <CheckCircle2 className="w-3 h-3" /> Enrolled
+              </Badge>
+            ) : (
+              <Badge variant="secondary" className="text-xs gap-1">
+                <Clock className="w-3 h-3" /> Not yet enrolled
+              </Badge>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function AdminProductPromotions() {
   const utils = trpc.useUtils();
@@ -59,8 +292,6 @@ export default function AdminProductPromotions() {
       setConfirmId(null);
       utils.productPromotions.listAll.invalidate();
       utils.productPromotions.listEnrollments.invalidate();
-      // Refresh the selected promo if it's open
-      if (selectedPromo?.id === confirmId) setSelectedPromo(null);
     },
     onError: (err) => toast.error(err.message),
   });
@@ -92,7 +323,10 @@ export default function AdminProductPromotions() {
   const confirmPromotion = (promotions as Promotion[]).find((p) => p.id === confirmId);
   const markPaidEnrollment = enrollments.find((e) => e.id === markPaidId);
 
-  const openDetail = (promo: Promotion) => setSelectedPromo(promo);
+  // Keep selected promo in sync with fresh data after student edits
+  const liveSelectedPromo = selectedPromo
+    ? ((promotions as Promotion[]).find((p) => p.id === selectedPromo.id) ?? selectedPromo)
+    : null;
 
   return (
     <DashboardLayout>
@@ -164,7 +398,7 @@ export default function AdminProductPromotions() {
                     <tr
                       key={promo.id}
                       className="hover:bg-gray-50 transition-colors cursor-pointer"
-                      onClick={() => openDetail(promo)}
+                      onClick={() => setSelectedPromo(promo)}
                     >
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
@@ -249,9 +483,9 @@ export default function AdminProductPromotions() {
       </div>
 
       {/* Detail Slide-over */}
-      <Sheet open={selectedPromo !== null} onOpenChange={(open) => !open && setSelectedPromo(null)}>
+      <Sheet open={liveSelectedPromo !== null} onOpenChange={(open) => !open && setSelectedPromo(null)}>
         <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-          {selectedPromo && (
+          {liveSelectedPromo && (
             <>
               <SheetHeader className="pb-4">
                 <SheetTitle className="flex items-center gap-2">
@@ -262,15 +496,15 @@ export default function AdminProductPromotions() {
 
               {/* Status Banner */}
               <div className={`rounded-lg p-3 mb-5 flex items-center gap-2 text-sm font-medium ${
-                !selectedPromo.enrollment
+                !liveSelectedPromo.enrollment
                   ? "bg-gray-100 text-gray-700"
-                  : selectedPromo.enrollment.status === "paid"
+                  : liveSelectedPromo.enrollment.status === "paid"
                   ? "bg-green-50 text-green-700"
                   : "bg-yellow-50 text-yellow-700"
               }`}>
-                {!selectedPromo.enrollment ? (
+                {!liveSelectedPromo.enrollment ? (
                   <><Clock className="w-4 h-4" /> Awaiting Enrollment</>
-                ) : selectedPromo.enrollment.status === "paid" ? (
+                ) : liveSelectedPromo.enrollment.status === "paid" ? (
                   <><CheckCircle2 className="w-4 h-4" /> Enrollment Confirmed &amp; Credit Paid</>
                 ) : (
                   <><DollarSign className="w-4 h-4" /> Enrolled — Credit Pending Payout</>
@@ -281,12 +515,12 @@ export default function AdminProductPromotions() {
               <section className="mb-5">
                 <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Product</h3>
                 <div className="bg-gray-50 rounded-lg p-3 space-y-1">
-                  <p className="font-semibold text-gray-900">{selectedPromo.product?.name ?? `#${selectedPromo.productId}`}</p>
-                  {selectedPromo.product?.category && (
-                    <p className="text-xs text-gray-500">{selectedPromo.product.category}</p>
+                  <p className="font-semibold text-gray-900">{liveSelectedPromo.product?.name ?? `#${liveSelectedPromo.productId}`}</p>
+                  {liveSelectedPromo.product?.category && (
+                    <p className="text-xs text-gray-500">{liveSelectedPromo.product.category}</p>
                   )}
-                  {selectedPromo.product?.price && (
-                    <p className="text-sm text-gray-700">${selectedPromo.product.price}</p>
+                  {liveSelectedPromo.product?.price && (
+                    <p className="text-sm text-gray-700">${liveSelectedPromo.product.price}</p>
                   )}
                 </div>
               </section>
@@ -301,9 +535,9 @@ export default function AdminProductPromotions() {
                     <User className="w-4 h-4 text-blue-600" />
                   </div>
                   <div>
-                    <p className="font-medium text-gray-900">{selectedPromo.parent?.name ?? `#${selectedPromo.parentId}`}</p>
-                    {selectedPromo.parent?.email && (
-                      <p className="text-sm text-gray-500">{selectedPromo.parent.email}</p>
+                    <p className="font-medium text-gray-900">{liveSelectedPromo.parent?.name ?? `#${liveSelectedPromo.parentId}`}</p>
+                    {liveSelectedPromo.parent?.email && (
+                      <p className="text-sm text-gray-500">{liveSelectedPromo.parent.email}</p>
                     )}
                   </div>
                 </div>
@@ -317,56 +551,18 @@ export default function AdminProductPromotions() {
                   <GraduationCap className="w-3.5 h-3.5" />
                   Student Information
                 </h3>
-                {selectedPromo.students && selectedPromo.students.length > 0 ? (
+                {liveSelectedPromo.students && liveSelectedPromo.students.length > 0 ? (
                   <div className="space-y-3">
-                    {selectedPromo.students.map((student, idx) => (
-                      <div key={student.id} className="bg-indigo-50 border border-indigo-100 rounded-lg p-4 space-y-3">
-                        {selectedPromo.students!.length > 1 && (
-                          <p className="text-xs font-semibold text-indigo-500 uppercase tracking-wide">Student {idx + 1}</p>
-                        )}
-                        {/* Name */}
-                        <div className="flex items-center gap-2">
-                          <User className="w-4 h-4 text-indigo-400 shrink-0" />
-                          <div>
-                            <p className="text-xs text-gray-500">Full Name</p>
-                            <p className="font-semibold text-gray-900">
-                              {student.name}{student.lastName ? ` ${student.lastName}` : ""}
-                            </p>
-                          </div>
-                        </div>
-                        {/* Grade Level */}
-                        {student.gradeLevel && (
-                          <div className="flex items-center gap-2">
-                            <BookOpen className="w-4 h-4 text-indigo-400 shrink-0" />
-                            <div>
-                              <p className="text-xs text-gray-500">Grade Level</p>
-                              <p className="text-sm text-gray-800">{student.gradeLevel}</p>
-                            </div>
-                          </div>
-                        )}
-                        {/* Education Goals */}
-                        {student.educationGoals && (
-                          <div className="flex items-start gap-2">
-                            <Target className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
-                            <div>
-                              <p className="text-xs text-gray-500">Education Goals</p>
-                              <p className="text-sm text-gray-800 leading-relaxed">{student.educationGoals}</p>
-                            </div>
-                          </div>
-                        )}
-                        {/* Enrollment status badge */}
-                        <div className="flex items-center gap-1.5 pt-1">
-                          {student.enrolled ? (
-                            <Badge className="bg-green-100 text-green-700 border-0 text-xs gap-1">
-                              <CheckCircle2 className="w-3 h-3" /> Enrolled
-                            </Badge>
-                          ) : (
-                            <Badge variant="secondary" className="text-xs gap-1">
-                              <Clock className="w-3 h-3" /> Not yet enrolled
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
+                    {liveSelectedPromo.students.map((student, idx) => (
+                      <StudentCard
+                        key={student.id}
+                        student={student}
+                        index={idx}
+                        total={liveSelectedPromo.students!.length}
+                        onSaved={() => {
+                          // The liveSelectedPromo will auto-refresh from the query cache
+                        }}
+                      />
                     ))}
                   </div>
                 ) : (
@@ -383,25 +579,25 @@ export default function AdminProductPromotions() {
               {/* Promoter Info */}
               <section className="mb-5">
                 <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Promoter</h3>
-                <p className="text-sm text-gray-800">{selectedPromo.promoter?.name ?? `#${selectedPromo.promoterId}`}</p>
-                {selectedPromo.promoter?.email && (
-                  <p className="text-xs text-gray-500">{selectedPromo.promoter.email}</p>
+                <p className="text-sm text-gray-800">{liveSelectedPromo.promoter?.name ?? `#${liveSelectedPromo.promoterId}`}</p>
+                {liveSelectedPromo.promoter?.email && (
+                  <p className="text-xs text-gray-500">{liveSelectedPromo.promoter.email}</p>
                 )}
               </section>
 
               {/* Message */}
-              {selectedPromo.message && (
+              {liveSelectedPromo.message && (
                 <>
                   <Separator className="my-4" />
                   <section className="mb-5">
                     <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Promoter Message</h3>
-                    <p className="text-sm text-gray-700 bg-gray-50 rounded-lg p-3 italic">"{selectedPromo.message}"</p>
+                    <p className="text-sm text-gray-700 bg-gray-50 rounded-lg p-3 italic">"{liveSelectedPromo.message}"</p>
                   </section>
                 </>
               )}
 
               {/* Enrollment Credit */}
-              {selectedPromo.enrollment && (
+              {liveSelectedPromo.enrollment && (
                 <>
                   <Separator className="my-4" />
                   <section className="mb-5">
@@ -409,15 +605,15 @@ export default function AdminProductPromotions() {
                     <div className="bg-green-50 border border-green-100 rounded-lg p-3 flex items-center justify-between">
                       <div>
                         <p className="text-xs text-green-600">Credit Amount</p>
-                        <p className="text-xl font-bold text-green-700">${selectedPromo.enrollment.creditAmount}</p>
+                        <p className="text-xl font-bold text-green-700">${liveSelectedPromo.enrollment.creditAmount}</p>
                       </div>
-                      <Badge className={`${selectedPromo.enrollment.status === "paid" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"} border-0`}>
-                        {selectedPromo.enrollment.status === "paid" ? "Paid" : "Pending"}
+                      <Badge className={`${liveSelectedPromo.enrollment.status === "paid" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"} border-0`}>
+                        {liveSelectedPromo.enrollment.status === "paid" ? "Paid" : "Pending"}
                       </Badge>
                     </div>
                     <p className="text-xs text-gray-400 mt-1.5">
-                      Enrolled: {new Date(selectedPromo.enrollment.enrolledAt).toLocaleDateString()}
-                      {selectedPromo.enrollment.paidAt && ` · Paid: ${new Date(selectedPromo.enrollment.paidAt).toLocaleDateString()}`}
+                      Enrolled: {new Date(liveSelectedPromo.enrollment.enrolledAt).toLocaleDateString()}
+                      {liveSelectedPromo.enrollment.paidAt && ` · Paid: ${new Date(liveSelectedPromo.enrollment.paidAt).toLocaleDateString()}`}
                     </p>
                   </section>
                 </>
@@ -425,22 +621,22 @@ export default function AdminProductPromotions() {
 
               {/* Actions */}
               <div className="flex flex-col gap-2 pt-2">
-                {!selectedPromo.enrollment && (
+                {!liveSelectedPromo.enrollment && (
                   <Button
                     className="w-full bg-green-600 hover:bg-green-700 gap-2"
                     onClick={() => {
-                      setConfirmId(selectedPromo.id);
+                      setConfirmId(liveSelectedPromo.id);
                       setSelectedPromo(null);
                     }}
                   >
                     <CheckCircle2 className="w-4 h-4" /> Confirm Enrollment &amp; Issue Credit
                   </Button>
                 )}
-                {selectedPromo.enrollment?.status === "pending" && (
+                {liveSelectedPromo.enrollment?.status === "pending" && (
                   <Button
                     className="w-full bg-purple-600 hover:bg-purple-700 gap-2"
                     onClick={() => {
-                      setMarkPaidId(selectedPromo.enrollment!.id);
+                      setMarkPaidId(liveSelectedPromo.enrollment!.id);
                       setSelectedPromo(null);
                     }}
                   >
@@ -450,7 +646,7 @@ export default function AdminProductPromotions() {
               </div>
 
               <p className="text-xs text-gray-400 text-center mt-4">
-                Sent on {new Date(selectedPromo.sentAt).toLocaleString()}
+                Sent on {new Date(liveSelectedPromo.sentAt).toLocaleString()}
               </p>
             </>
           )}

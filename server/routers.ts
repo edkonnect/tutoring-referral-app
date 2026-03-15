@@ -194,9 +194,11 @@ const studentsRouter = router({
       z.object({
         id: z.number(),
         name: z.string().min(1).optional(),
+        lastName: z.string().optional(),
         age: z.number().min(1).max(25).optional(),
         gradeLevel: z.string().optional(),
         subjects: z.string().optional(),
+        educationGoals: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {

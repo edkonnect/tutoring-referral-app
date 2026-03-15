@@ -299,3 +299,11 @@
 - [x] Admin UI: show student summary (name + grade) inline on the promotions table row
 - [x] Admin UI: support multiple students per parent in the detail view
 - [x] Vitest tests: 6 new tests for student info enrichment in listAll (182 total passing)
+
+## Admin Inline Student Edit from Promotion Detail View
+- [x] Frontend: Add "Edit" button per student card in the detail slide-over
+- [x] Frontend: Toggle student card to inline edit form (first name, last name, grade level, education goals)
+- [x] Frontend: Save/Cancel buttons with cache invalidation and success/error toasts
+- [x] Frontend: Live sync — slide-over auto-refreshes from query cache after save
+- [x] Backend: students.update tRPC input schema extended with lastName and educationGoals
+- [x] Vitest tests: 9 new tests for students.update (191 total passing)

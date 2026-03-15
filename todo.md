@@ -291,3 +291,11 @@
 - [x] Frontend: add student info section to EnrollmentLanding page (first name, last name, grade level dropdown, education goals textarea)
 - [x] Frontend: validate all student fields as required before allowing form submission
 - [x] Vitest tests for selfEnroll with student info (176 total passing)
+
+## Student Info in Admin Enrollment Detail View
+- [x] Backend: update productPromotions.listAll to fetch students per parent via getStudentsByParent
+- [x] Admin UI: show student name, grade level, and education goals in the enrollment detail slide-over
+- [x] Admin UI: show "No student info" placeholder when student data is not yet collected (pre-existing promotions)
+- [x] Admin UI: show student summary (name + grade) inline on the promotions table row
+- [x] Admin UI: support multiple students per parent in the detail view
+- [x] Vitest tests: 6 new tests for student info enrichment in listAll (182 total passing)

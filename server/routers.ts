@@ -992,13 +992,14 @@ const productPromotionsRouter = router({
     const promotions = await getAllProductPromotions();
     const enriched = await Promise.all(
       promotions.map(async (promo) => {
-        const [product, parent, promoter, enrollment] = await Promise.all([
+        const [product, parent, promoter, enrollment, students] = await Promise.all([
           getProductById(promo.productId),
           getParentById(promo.parentId),
           getUserById(promo.promoterId),
           getProductEnrollmentByPromotionId(promo.id),
+          getStudentsByParent(promo.parentId),
         ]);
-        return { ...promo, product, parent, promoter, enrollment };
+        return { ...promo, product, parent, promoter, enrollment, students };
       })
     );
     return enriched;

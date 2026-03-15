@@ -307,3 +307,12 @@
 - [x] Frontend: Live sync — slide-over auto-refreshes from query cache after save
 - [x] Backend: students.update tRPC input schema extended with lastName and educationGoals
 - [x] Vitest tests: 9 new tests for students.update (191 total passing)
+
+## Full Student Info Display in Admin
+- [x] Admin Students page: table now shows full name (first + last), grade level badge, education goals (truncated), status
+- [x] Admin Students page: detail slide-over shows all fields: first name, last name, grade level, education goals, subjects, age, registered date
+- [x] Admin Students page: inline edit form in slide-over for all fields
+- [x] Admin Enrollments page: pending cards show full name, grade badge, education goals, subjects
+- [x] Admin Enrollments page: confirm dialog shows full name, grade, education goals, subjects
+- [x] Admin Enrollments page: enrolled table shows full name, grade level, education goals columns
+- [x] 191 tests passing (no regressions)

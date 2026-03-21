@@ -10,8 +10,19 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { Package, Send, DollarSign, Loader2, Search, Users, CheckSquare, Square } from "lucide-react";
+import {
+  Package,
+  Send,
+  DollarSign,
+  Loader2,
+  Search,
+  Users,
+  CheckSquare,
+  Square,
+  BookOpen,
+} from "lucide-react";
 
 export default function PromoterProducts() {
   const utils = trpc.useUtils();
@@ -19,34 +30,62 @@ export default function PromoterProducts() {
   const { data: products = [], isLoading: loadingProducts } = trpc.products.list.useQuery();
   const { data: parents = [], isLoading: loadingParents } = trpc.parents.list.useQuery();
 
-  const [sendDialog, setSendDialog] = useState<{ open: boolean; productId: number | null }>({
-    open: false,
-    productId: null,
-  });
+  // Dialog state
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedProductIds, setSelectedProductIds] = useState<Set<number>>(new Set());
   const [selectedParentIds, setSelectedParentIds] = useState<Set<number>>(new Set());
   const [message, setMessage] = useState("");
+  const [productSearch, setProductSearch] = useState("");
   const [parentSearch, setParentSearch] = useState("");
 
   const sendMutation = trpc.productPromotions.send.useMutation({
     onSuccess: (data) => {
       const { sent, failed } = data;
+      const productCount = selectedProductIds.size;
+      const parentCount = selectedParentIds.size;
       if (failed === 0) {
-        toast.success(`Promotion sent to ${sent} parent${sent !== 1 ? "s" : ""}! They will be notified by email.`);
+        toast.success(
+          `Sent ${sent} promotion${sent !== 1 ? "s" : ""} (${productCount} product${productCount !== 1 ? "s" : ""} × ${parentCount} parent${parentCount !== 1 ? "s" : ""})!`
+        );
       } else if (sent > 0) {
-        toast.warning(`Sent to ${sent} parent${sent !== 1 ? "s" : ""}, but ${failed} failed. Check your parent list.`);
+        toast.warning(`Sent ${sent}, but ${failed} failed. Check your selections.`);
       } else {
-        toast.error("Failed to send promotion. Please try again.");
+        toast.error("Failed to send promotions. Please try again.");
       }
-      setSendDialog({ open: false, productId: null });
-      setSelectedParentIds(new Set());
-      setMessage("");
-      setParentSearch("");
+      closeDialog();
       utils.productPromotions.myList.invalidate();
     },
     onError: (err) => toast.error(err.message),
   });
 
-  const selectedProduct = products.find((p) => p.id === sendDialog.productId);
+  function openDialog(preSelectProductId?: number) {
+    setSelectedProductIds(preSelectProductId ? new Set([preSelectProductId]) : new Set());
+    setSelectedParentIds(new Set());
+    setMessage("");
+    setProductSearch("");
+    setParentSearch("");
+    setDialogOpen(true);
+  }
+
+  function closeDialog() {
+    setDialogOpen(false);
+    setSelectedProductIds(new Set());
+    setSelectedParentIds(new Set());
+    setMessage("");
+    setProductSearch("");
+    setParentSearch("");
+  }
+
+  // Filtered lists
+  const filteredProducts = useMemo(() => {
+    const q = productSearch.toLowerCase().trim();
+    if (!q) return products;
+    return products.filter(
+      (p) =>
+        p.name.toLowerCase().includes(q) ||
+        (p.category && p.category.toLowerCase().includes(q))
+    );
+  }, [products, productSearch]);
 
   const filteredParents = useMemo(() => {
     const q = parentSearch.toLowerCase().trim();
@@ -58,49 +97,64 @@ export default function PromoterProducts() {
     );
   }, [parents, parentSearch]);
 
-  const allFilteredSelected =
+  // Select-all helpers
+  const allProductsSelected =
+    filteredProducts.length > 0 && filteredProducts.every((p) => selectedProductIds.has(p.id));
+  const allParentsSelected =
     filteredParents.length > 0 && filteredParents.every((p) => selectedParentIds.has(p.id));
 
-  function toggleParent(id: number) {
-    setSelectedParentIds((prev) => {
+  function toggleProduct(id: number) {
+    setSelectedProductIds((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
   }
 
-  function toggleAllFiltered() {
+  function toggleParent(id: number) {
     setSelectedParentIds((prev) => {
       const next = new Set(prev);
-      if (allFilteredSelected) {
-        filteredParents.forEach((p) => next.delete(p.id));
-      } else {
-        filteredParents.forEach((p) => next.add(p.id));
-      }
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAllProducts() {
+    setSelectedProductIds((prev) => {
+      const next = new Set(prev);
+      if (allProductsSelected) filteredProducts.forEach((p) => next.delete(p.id));
+      else filteredProducts.forEach((p) => next.add(p.id));
+      return next;
+    });
+  }
+
+  function toggleAllParents() {
+    setSelectedParentIds((prev) => {
+      const next = new Set(prev);
+      if (allParentsSelected) filteredParents.forEach((p) => next.delete(p.id));
+      else filteredParents.forEach((p) => next.add(p.id));
       return next;
     });
   }
 
   function handleSend() {
-    if (!sendDialog.productId || selectedParentIds.size === 0) {
+    if (selectedProductIds.size === 0) {
+      toast.error("Please select at least one product.");
+      return;
+    }
+    if (selectedParentIds.size === 0) {
       toast.error("Please select at least one parent.");
       return;
     }
     sendMutation.mutate({
-      productId: sendDialog.productId,
+      productIds: Array.from(selectedProductIds),
       parentIds: Array.from(selectedParentIds),
       message: message.trim() || undefined,
       origin: window.location.origin,
     });
   }
 
-  function openDialog(productId: number) {
-    setSendDialog({ open: true, productId });
-    setSelectedParentIds(new Set());
-    setMessage("");
-    setParentSearch("");
-  }
+  const totalPromotions = selectedProductIds.size * selectedParentIds.size;
 
   const CATEGORY_COLORS: Record<string, string> = {
     Math: "bg-blue-100 text-blue-700",
@@ -115,12 +169,21 @@ export default function PromoterProducts() {
     <DashboardLayout>
       <div className="p-6 space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Products</h1>
-          <p className="text-gray-500 mt-1">
-            Browse available products and send promotions to your parents. Earn{" "}
-            <span className="font-semibold text-green-600">$25</span> for each enrollment.
-          </p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Products</h1>
+            <p className="text-gray-500 mt-1">
+              Browse available products and send promotions to your parents.
+            </p>
+          </div>
+          <Button
+            onClick={() => openDialog()}
+            disabled={products.length === 0 || parents.length === 0}
+            className="gap-2 shrink-0"
+          >
+            <Send className="w-4 h-4" />
+            Send Promotions
+          </Button>
         </div>
 
         {/* Info Banner */}
@@ -129,8 +192,9 @@ export default function PromoterProducts() {
           <div>
             <p className="text-sm font-medium text-blue-800">How it works</p>
             <p className="text-sm text-blue-700 mt-0.5">
-              Select a product, choose one or more parents from your list, and send them the promotion. When the admin confirms their enrollment, you earn a{" "}
-              <strong>$25 credit</strong> per parent automatically.
+              Click <strong>Send Promotions</strong> to select one or more products and one or more
+              parents. Each parent receives a personalised email with a registration link. When the
+              admin confirms their enrollment, you earn a referral credit automatically.
             </p>
           </div>
         </div>
@@ -181,10 +245,15 @@ export default function PromoterProducts() {
                   <div className="flex items-center justify-between pt-1">
                     <div className="flex items-center gap-1.5 text-green-600">
                       <DollarSign className="w-4 h-4" />
-                      <span className="text-sm font-semibold">$25 credit on enrollment</span>
+                      <span className="text-sm font-semibold">
+                        {product.referralFeeOverride
+                          ? `$${Number(product.referralFeeOverride).toFixed(2)} credit`
+                          : "Credit on enrollment"}
+                      </span>
                     </div>
                     <Button
                       size="sm"
+                      variant="outline"
                       onClick={() => openDialog(product.id)}
                       disabled={parents.length === 0}
                       className="gap-1.5"
@@ -203,43 +272,113 @@ export default function PromoterProducts() {
         )}
       </div>
 
-      {/* Send Promotion Dialog */}
-      <Dialog
-        open={sendDialog.open}
-        onOpenChange={(open) => {
-          if (!open) setSendDialog({ open: false, productId: null });
-        }}
-      >
-        <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col">
+      {/* Send Promotions Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={(open) => { if (!open) closeDialog(); }}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Send className="w-5 h-5 text-blue-600" />
-              Send Promotion
+              Send Promotions
             </DialogTitle>
           </DialogHeader>
 
-          {selectedProduct && (
-            <div className="flex-1 overflow-y-auto space-y-4 pr-1">
-              {/* Product Summary */}
-              <div className="bg-gray-50 rounded-lg p-3 border">
-                <div className="flex items-center gap-2">
-                  <Package className="w-4 h-4 text-gray-500" />
-                  <span className="font-medium text-gray-900">{selectedProduct.name}</span>
-                  {selectedProduct.price && (
-                    <span className="text-sm text-gray-500 ml-auto">${Number(selectedProduct.price).toFixed(2)}</span>
-                  )}
-                </div>
-                {selectedProduct.description && (
-                  <p className="text-xs text-gray-500 mt-1.5 line-clamp-2">{selectedProduct.description}</p>
-                )}
-              </div>
-
-              {/* Parent Multi-Select */}
+          <div className="flex-1 overflow-y-auto space-y-5 pr-1">
+            {/* Two-column selection */}
+            <div className="grid grid-cols-2 gap-4">
+              {/* Products column */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label className="flex items-center gap-1.5">
+                  <Label className="flex items-center gap-1.5 text-sm font-medium">
+                    <BookOpen className="w-3.5 h-3.5 text-gray-400" />
+                    Products
+                    <span className="text-red-500">*</span>
+                  </Label>
+                  {selectedProductIds.size > 0 && (
+                    <Badge variant="secondary" className="text-xs">
+                      {selectedProductIds.size} selected
+                    </Badge>
+                  )}
+                </div>
+
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                  <Input
+                    placeholder="Search products…"
+                    value={productSearch}
+                    onChange={(e) => setProductSearch(e.target.value)}
+                    className="pl-8 h-8 text-sm"
+                  />
+                </div>
+
+                {filteredProducts.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={toggleAllProducts}
+                    className="flex items-center gap-2 text-xs text-blue-600 hover:text-blue-800 font-medium"
+                  >
+                    {allProductsSelected ? (
+                      <CheckSquare className="w-3.5 h-3.5" />
+                    ) : (
+                      <Square className="w-3.5 h-3.5" />
+                    )}
+                    {allProductsSelected ? "Deselect all" : "Select all"}
+                  </button>
+                )}
+
+                <ScrollArea className="h-52 rounded-md border bg-white">
+                  {loadingProducts ? (
+                    <div className="flex items-center justify-center h-full">
+                      <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+                    </div>
+                  ) : filteredProducts.length === 0 ? (
+                    <div className="flex items-center justify-center h-full text-gray-400 text-sm p-4 text-center">
+                      {productSearch ? "No products match." : "No products available."}
+                    </div>
+                  ) : (
+                    <div className="p-1">
+                      {filteredProducts.map((product) => {
+                        const checked = selectedProductIds.has(product.id);
+                        return (
+                          <label
+                            key={product.id}
+                            className={`flex items-start gap-3 px-3 py-2.5 rounded-md cursor-pointer transition-colors ${
+                              checked ? "bg-blue-50 hover:bg-blue-100" : "hover:bg-gray-50"
+                            }`}
+                          >
+                            <Checkbox
+                              checked={checked}
+                              onCheckedChange={() => toggleProduct(product.id)}
+                              className="shrink-0 mt-0.5"
+                            />
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-gray-900 truncate leading-tight">
+                                {product.name}
+                              </p>
+                              <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                {product.category && (
+                                  <span className="text-xs text-gray-400">{product.category}</span>
+                                )}
+                                {product.price && (
+                                  <span className="text-xs text-gray-500 font-medium">
+                                    ${Number(product.price).toFixed(2)}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                </ScrollArea>
+              </div>
+
+              {/* Parents column */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="flex items-center gap-1.5 text-sm font-medium">
                     <Users className="w-3.5 h-3.5 text-gray-400" />
-                    Select Parents
+                    Parents
                     <span className="text-red-500">*</span>
                   </Label>
                   {selectedParentIds.size > 0 && (
@@ -249,42 +388,39 @@ export default function PromoterProducts() {
                   )}
                 </div>
 
-                {/* Search */}
                 <div className="relative">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
                   <Input
-                    placeholder="Search by name or email…"
+                    placeholder="Search parents…"
                     value={parentSearch}
                     onChange={(e) => setParentSearch(e.target.value)}
                     className="pl-8 h-8 text-sm"
                   />
                 </div>
 
-                {/* Select All toggle */}
                 {filteredParents.length > 1 && (
                   <button
                     type="button"
-                    onClick={toggleAllFiltered}
+                    onClick={toggleAllParents}
                     className="flex items-center gap-2 text-xs text-blue-600 hover:text-blue-800 font-medium"
                   >
-                    {allFilteredSelected ? (
+                    {allParentsSelected ? (
                       <CheckSquare className="w-3.5 h-3.5" />
                     ) : (
                       <Square className="w-3.5 h-3.5" />
                     )}
-                    {allFilteredSelected ? "Deselect all" : `Select all ${filteredParents.length}`}
+                    {allParentsSelected ? "Deselect all" : "Select all"}
                   </button>
                 )}
 
-                {/* Parent list */}
-                <ScrollArea className="h-44 rounded-md border bg-white">
+                <ScrollArea className="h-52 rounded-md border bg-white">
                   {loadingParents ? (
                     <div className="flex items-center justify-center h-full">
                       <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
                     </div>
                   ) : filteredParents.length === 0 ? (
-                    <div className="flex items-center justify-center h-full text-gray-400 text-sm">
-                      {parentSearch ? "No parents match your search." : "No parents available."}
+                    <div className="flex items-center justify-center h-full text-gray-400 text-sm p-4 text-center">
+                      {parentSearch ? "No parents match." : "No parents available."}
                     </div>
                   ) : (
                     <div className="p-1">
@@ -294,9 +430,7 @@ export default function PromoterProducts() {
                           <label
                             key={parent.id}
                             className={`flex items-center gap-3 px-3 py-2.5 rounded-md cursor-pointer transition-colors ${
-                              checked
-                                ? "bg-blue-50 hover:bg-blue-100"
-                                : "hover:bg-gray-50"
+                              checked ? "bg-blue-50 hover:bg-blue-100" : "hover:bg-gray-50"
                             }`}
                           >
                             <Checkbox
@@ -317,41 +451,57 @@ export default function PromoterProducts() {
                   )}
                 </ScrollArea>
               </div>
-
-              {/* Optional Message */}
-              <div className="space-y-1.5">
-                <Label htmlFor="promo-message">
-                  Personal Message{" "}
-                  <span className="text-gray-400 font-normal">(optional)</span>
-                </Label>
-                <Textarea
-                  id="promo-message"
-                  placeholder="Add a personal note to accompany the promotion details…"
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  rows={3}
-                  className="resize-none"
-                />
-              </div>
-
-              <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-700">
-                <strong>Reminder:</strong> You'll earn <strong>$25</strong> for each parent who enrolls in{" "}
-                {selectedProduct.name}.
-              </div>
             </div>
-          )}
+
+            {/* Summary bar */}
+            {totalPromotions > 0 && (
+              <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm text-green-700 flex items-center gap-2">
+                <Send className="w-4 h-4 shrink-0" />
+                <span>
+                  This will send{" "}
+                  <strong>{totalPromotions} email{totalPromotions !== 1 ? "s" : ""}</strong>
+                  {" "}—{" "}
+                  <strong>{selectedProductIds.size} product{selectedProductIds.size !== 1 ? "s" : ""}</strong>
+                  {" "}to{" "}
+                  <strong>{selectedParentIds.size} parent{selectedParentIds.size !== 1 ? "s" : ""}</strong>.
+                </span>
+              </div>
+            )}
+
+            <Separator />
+
+            {/* Optional Message */}
+            <div className="space-y-1.5">
+              <Label htmlFor="promo-message">
+                Personal Message{" "}
+                <span className="text-gray-400 font-normal">(optional)</span>
+              </Label>
+              <Textarea
+                id="promo-message"
+                placeholder="Add a personal note to accompany the promotion details…"
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                rows={3}
+                className="resize-none"
+              />
+            </div>
+          </div>
 
           <DialogFooter className="pt-2 border-t mt-2">
             <Button
               variant="outline"
-              onClick={() => setSendDialog({ open: false, productId: null })}
+              onClick={closeDialog}
               disabled={sendMutation.isPending}
             >
               Cancel
             </Button>
             <Button
               onClick={handleSend}
-              disabled={selectedParentIds.size === 0 || sendMutation.isPending}
+              disabled={
+                selectedProductIds.size === 0 ||
+                selectedParentIds.size === 0 ||
+                sendMutation.isPending
+              }
               className="gap-2"
             >
               {sendMutation.isPending ? (
@@ -359,9 +509,9 @@ export default function PromoterProducts() {
               ) : (
                 <Send className="w-4 h-4" />
               )}
-              {selectedParentIds.size > 1
-                ? `Send to ${selectedParentIds.size} Parents`
-                : "Send Promotion"}
+              {totalPromotions > 0
+                ? `Send ${totalPromotions} Promotion${totalPromotions !== 1 ? "s" : ""}`
+                : "Send Promotions"}
             </Button>
           </DialogFooter>
         </DialogContent>

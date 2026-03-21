@@ -838,45 +838,51 @@ const productsRouter = router({
 // ─── Product Promotions Router ─────────────────────────────────────────────────────
 
 const productPromotionsRouter = router({
-  // Promoter sends a product promotion to one or more parents
+  // Promoter sends a product promotion to one or more products × one or more parents
   send: promoterProcedure
     .input(
       z.object({
         parentIds: z.array(z.number()).min(1, "Select at least one parent"),
-        productId: z.number(),
+        productIds: z.array(z.number()).min(1, "Select at least one product"),
         message: z.string().optional(),
         origin: z.string().url().optional().default("https://app.example.com"),
       })
     )
     .mutation(async ({ input, ctx }) => {
       const promoterId = ctx.user.id;
-
-      // Verify product exists and is active
-      const product = await getProductById(input.productId);
-      if (!product || !product.active) throw new TRPCError({ code: "NOT_FOUND", message: "Product not found or inactive" });
-
       const { nanoid } = await import("nanoid");
       const promoterName = ctx.user.name ?? "Your referrer";
-      const priceDisplay = product.price ? `$${parseFloat(product.price).toFixed(2)}` : "Contact us for pricing";
 
-      // Fetch template once for all parents
-      const productWithTemplate = await getProductWithTemplate(input.productId);
-      const template = productWithTemplate?.template;
+      const results: { productId: number; parentId: number; success: boolean; error?: string }[] = [];
 
-      const results: { parentId: number; success: boolean; error?: string }[] = [];
+      for (const productId of input.productIds) {
+        // Verify product exists and is active
+        const product = await getProductById(productId);
+        if (!product || !product.active) {
+          for (const parentId of input.parentIds) {
+            results.push({ productId, parentId, success: false, error: "Product not found or inactive" });
+          }
+          continue;
+        }
 
-      for (const parentId of input.parentIds) {
+        const priceDisplay = product.price ? `$${parseFloat(product.price).toFixed(2)}` : "Contact us for pricing";
+
+        // Fetch template once per product for all parents
+        const productWithTemplate = await getProductWithTemplate(productId);
+        const template = productWithTemplate?.template;
+
+        for (const parentId of input.parentIds) {
         try {
           // Verify this parent belongs to the promoter (or admin)
           const parent = await getParentById(parentId);
-          if (!parent) { results.push({ parentId, success: false, error: "Parent not found" }); continue; }
+          if (!parent) { results.push({ productId, parentId, success: false, error: "Parent not found" }); continue; }
           if (ctx.user.role !== "admin" && parent.promoterId !== promoterId) {
-            results.push({ parentId, success: false, error: "Parent does not belong to you" }); continue;
+            results.push({ productId, parentId, success: false, error: "Parent does not belong to you" }); continue;
           }
 
           // Generate a unique enrollment token per parent
           const enrollmentToken = nanoid(32);
-          await sendProductPromotion({ promoterId, parentId, productId: input.productId, message: input.message, enrollmentToken });
+          await sendProductPromotion({ promoterId, parentId, productId, message: input.message, enrollmentToken });
 
           const registrationLink = `${input.origin}/enroll/${enrollmentToken}`;
 
@@ -960,12 +966,13 @@ const productPromotionsRouter = router({
             }
           }
 
-          results.push({ parentId, success: true });
+          results.push({ productId, parentId, success: true });
         } catch (err) {
           console.error(`[Promotion] Failed for parent ${parentId}:`, err);
-          results.push({ parentId, success: false, error: err instanceof Error ? err.message : "Unknown error" });
+          results.push({ productId, parentId, success: false, error: err instanceof Error ? err.message : "Unknown error" });
         }
-      }
+        } // end parentIds loop
+      } // end productIds loop
 
       const sent = results.filter((r) => r.success).length;
       const failed = results.filter((r) => !r.success).length;

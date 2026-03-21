@@ -118,7 +118,7 @@ describe("productPromotions router — send", () => {
     vi.mocked(db.getProductById).mockResolvedValue(mockProduct() as any);
 
     const caller = appRouter.createCaller(makePromoterCtx(2));
-    const result = await caller.productPromotions.send({ parentIds: [10], productId: 5, message: "Check this out!" });
+    const result = await caller.productPromotions.send({ parentIds: [10], productIds: [5], message: "Check this out!" });
     expect(result.success).toBe(true);
     expect(result.sent).toBe(1);
     expect(result.failed).toBe(0);
@@ -135,7 +135,7 @@ describe("productPromotions router — send", () => {
     vi.mocked(db.getProductById).mockResolvedValue(mockProduct() as any);
 
     const caller = appRouter.createCaller(makePromoterCtx(2));
-    const result = await caller.productPromotions.send({ parentIds: [10, 11, 12], productId: 5 });
+    const result = await caller.productPromotions.send({ parentIds: [10, 11, 12], productIds: [5] });
     expect(result.success).toBe(true);
     expect(result.sent).toBe(3);
     expect(result.failed).toBe(0);
@@ -149,7 +149,7 @@ describe("productPromotions router — send", () => {
     vi.mocked(db.getProductById).mockResolvedValue(mockProduct() as any);
 
     const caller = appRouter.createCaller(makePromoterCtx(2));
-    await caller.productPromotions.send({ parentIds: [10, 11], productId: 5 });
+    await caller.productPromotions.send({ parentIds: [10, 11], productIds: [5] });
 
     const calls = vi.mocked(db.sendProductPromotion).mock.calls;
     const token1 = calls[0][0].enrollmentToken;
@@ -166,7 +166,7 @@ describe("productPromotions router — send", () => {
     vi.mocked(db.getProductById).mockResolvedValue(mockProduct() as any);
 
     const caller = appRouter.createCaller(makePromoterCtx(2));
-    await caller.productPromotions.send({ parentIds: [10, 11], productId: 5 });
+    await caller.productPromotions.send({ parentIds: [10, 11], productIds: [5] });
 
     expect(emailModule.sendEmail).toHaveBeenCalledTimes(2);
     const emailCalls = vi.mocked(emailModule.sendEmail).mock.calls.map((c) => c[0].to);
@@ -185,7 +185,7 @@ describe("productPromotions router — send", () => {
     vi.mocked(db.getProductById).mockResolvedValue(mockProduct() as any);
 
     const caller = appRouter.createCaller(makePromoterCtx(2));
-    const result = await caller.productPromotions.send({ parentIds: [10, 11], productId: 5 });
+    const result = await caller.productPromotions.send({ parentIds: [10, 11], productIds: [5] });
 
     // Promotion records are still created, just no email
     expect(result.sent).toBe(2);
@@ -199,20 +199,21 @@ describe("productPromotions router — send", () => {
     vi.mocked(db.getProductById).mockResolvedValue(mockProduct() as any);
 
     const caller = appRouter.createCaller(makePromoterCtx(2));
-    const result = await caller.productPromotions.send({ parentIds: [10, 11], productId: 5 });
+    const result = await caller.productPromotions.send({ parentIds: [10, 11], productIds: [5] });
 
     expect(result.sent).toBe(1);
     expect(result.failed).toBe(1);
     expect(result.results.find((r) => r.parentId === 11)?.error).toBe("Parent does not belong to you");
   });
 
-  it("throws NOT_FOUND when product is inactive", async () => {
+  it("returns failed result when product is inactive (no throw)", async () => {
     vi.mocked(db.getProductById).mockResolvedValue(mockProduct(false) as any);
 
     const caller = appRouter.createCaller(makePromoterCtx(2));
-    await expect(
-      caller.productPromotions.send({ parentIds: [10], productId: 5 })
-    ).rejects.toThrow("Product not found or inactive");
+    const result = await caller.productPromotions.send({ parentIds: [10], productIds: [5] });
+    expect(result.sent).toBe(0);
+    expect(result.failed).toBe(1);
+    expect(result.results[0].error).toMatch(/Product not found or inactive/);
   });
 
   it("rejects empty parentIds array", async () => {
@@ -220,7 +221,7 @@ describe("productPromotions router — send", () => {
 
     const caller = appRouter.createCaller(makePromoterCtx(2));
     await expect(
-      caller.productPromotions.send({ parentIds: [], productId: 5 })
+      caller.productPromotions.send({ parentIds: [], productIds: [5] })
     ).rejects.toThrow();
   });
 
@@ -229,7 +230,7 @@ describe("productPromotions router — send", () => {
     vi.mocked(db.getProductById).mockResolvedValue(mockProduct() as any);
 
     const caller = appRouter.createCaller(makeAdminCtx());
-    const result = await caller.productPromotions.send({ parentIds: [10], productId: 5 });
+    const result = await caller.productPromotions.send({ parentIds: [10], productIds: [5] });
     expect(result.sent).toBe(1);
   });
 });

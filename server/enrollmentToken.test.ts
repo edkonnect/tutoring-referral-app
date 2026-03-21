@@ -332,7 +332,7 @@ describe("productPromotions.send — enrollment token generation", () => {
     const caller = appRouter.createCaller(promoterCtx);
     await caller.productPromotions.send({
       parentIds: [10],
-      productId: 5,
+      productIds: [5],
       origin: "https://app.example.com",
     });
     expect(vi.mocked(sendProductPromotion)).toHaveBeenCalledWith(
@@ -345,7 +345,7 @@ describe("productPromotions.send — enrollment token generation", () => {
     const caller = appRouter.createCaller(promoterCtx);
     await caller.productPromotions.send({
       parentIds: [10],
-      productId: 5,
+      productIds: [5],
       origin: "https://app.example.com",
     });
     const callArgs = vi.mocked(sendProductPromotion).mock.calls[0][0];

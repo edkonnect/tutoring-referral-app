@@ -316,3 +316,14 @@
 - [x] Admin Enrollments page: confirm dialog shows full name, grade, education goals, subjects
 - [x] Admin Enrollments page: enrolled table shows full name, grade level, education goals columns
 - [x] 191 tests passing (no regressions)
+
+## Multi-Product Multi-Parent Promotion
+- [x] Backend: update productPromotions.send to accept productIds[] AND parentIds[]
+- [x] Backend: loop over every product × parent combination, create one record + send one email each
+- [x] Backend: partial failure handling — inactive products return failed results, active combinations proceed
+- [x] Frontend: redesign Send Promotion dialog — two-panel layout with product multi-select (left) and parent multi-select (right)
+- [x] Frontend: product list shows name, category, price, and optional custom referral fee badge
+- [x] Frontend: parent list shows name, email with checkboxes (existing multi-select)
+- [x] Frontend: show summary count before sending ("Send X emails (Y products × Z parents)")
+- [x] Frontend: Send button disabled until at least 1 product and 1 parent selected
+- [x] Vitest tests for multi-product multi-parent send (191 total passing)

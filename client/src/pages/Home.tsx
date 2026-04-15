@@ -30,8 +30,24 @@ export default function Home() {
   }, [user, loading, setLocation]);
 
   const loginMutation = trpc.invite.login.useMutation({
-    onSuccess: async () => {
-      // Refetch auth state to get the newly set session
+    onSuccess: async (data) => {
+      if (data.role === "admin") {
+        setLoginError("This is an admin account. Please use Sign in as Admin.");
+        return;
+      }
+      await refresh();
+    },
+    onError: (err) => {
+      setLoginError(err.message);
+    },
+  });
+
+  const adminLoginMutation = trpc.invite.login.useMutation({
+    onSuccess: async (data) => {
+      if (data.role !== "admin") {
+        setLoginError("This account does not have admin access.");
+        return;
+      }
       await refresh();
     },
     onError: (err) => {
@@ -182,15 +198,23 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Admin OAuth login */}
-            <Button
-              onClick={() => { window.location.href = getLoginUrl(); }}
-              variant="outline"
-              className="w-full border-white/20 text-white bg-white/5 hover:bg-white/10"
-            >
-              Sign in as Admin (SSO)
-            </Button>
 
+            <Button
+              type="button"
+              onClick={() => adminLoginMutation.mutate({ email, password })}
+              variant="outline"
+              className="w-full border-white/20 text-white bg-white/5 hover:bg-white/10 mt-2"
+              disabled={adminLoginMutation.isPending}
+            >
+              {adminLoginMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Signing in…
+                </>
+              ) : (
+                "Sign in as Admin"
+              )}
+            </Button>
             <p className="text-center text-xs text-slate-500 mt-4">
               New promoter? Check your email for an invitation link.
             </p>

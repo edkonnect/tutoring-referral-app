@@ -9,4 +9,9 @@ export const ENV = {
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
   gmailUser: process.env.GMAIL_USER ?? "",
   gmailAppPassword: process.env.GMAIL_APP_PASSWORD ?? "",
+  emailHost: process.env.EMAIL_HOST ?? "",
+  emailPort: parseInt(process.env.EMAIL_PORT ?? "587"),
+  emailUser: process.env.EMAIL_USER ?? "",
+  emailPassword: process.env.EMAIL_PASSWORD ?? "",
+  emailFrom: process.env.EMAIL_FROM ?? "",
 };

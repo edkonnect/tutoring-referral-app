@@ -306,6 +306,7 @@ export default function AdminProductPromotions() {
     onError: (err) => toast.error(err.message),
   });
 
+
   const filtered = (promotions as Promotion[]).filter((p) => {
     const q = search.toLowerCase();
     return (
@@ -386,6 +387,8 @@ export default function AdminProductPromotions() {
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Promoter</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Student Info</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Sent</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">Promoter Commission</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">Admin Commission</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Status</th>
                   <th className="text-right px-4 py-3 font-medium text-gray-600">Actions</th>
                 </tr>
@@ -436,6 +439,16 @@ export default function AdminProductPromotions() {
                         )}
                       </td>
                       <td className="px-4 py-3 text-gray-500">{new Date(promo.sentAt).toLocaleDateString()}</td>
+                      <td className="px-4 py-3 text-sm">
+                        {promo.product?.promoterCommission != null && promo.product?.price != null
+                          ? <span className="font-medium text-indigo-600">${(Number(promo.product.price) * Number(promo.product.promoterCommission) / 100).toFixed(2)} <span className="text-xs text-gray-400">({Number(promo.product.promoterCommission)}%)</span></span>
+                          : <span className="text-gray-400">—</span>}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        {promo.product?.adminCommission != null && promo.product?.price != null
+                          ? <span className="font-medium text-purple-600">${(Number(promo.product.price) * Number(promo.product.adminCommission) / 100).toFixed(2)} <span className="text-xs text-gray-400">({Number(promo.product.adminCommission)}%)</span></span>
+                          : <span className="text-gray-400">—</span>}
+                      </td>
                       <td className="px-4 py-3">
                         {!promo.enrollment ? (
                           <Badge variant="secondary" className="gap-1 text-xs"><Clock className="w-3 h-3" />Awaiting</Badge>

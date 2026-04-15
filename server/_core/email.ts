@@ -12,40 +12,33 @@ let _transporter: nodemailer.Transporter | null = null;
 
 function getTransporter(): nodemailer.Transporter | null {
   if (_transporter) return _transporter;
-
-  if (!ENV.gmailUser || !ENV.gmailAppPassword) {
-    console.warn("[Email] Gmail credentials not configured (GMAIL_USER / GMAIL_APP_PASSWORD missing)");
+  if (!ENV.emailHost || !ENV.emailUser || !ENV.emailPassword) {
+    console.warn("[Email] SMTP credentials not configured");
     return null;
   }
-
   _transporter = nodemailer.createTransport({
-    service: "gmail",
+    host: ENV.emailHost,
+    port: ENV.emailPort,
+    secure: false,
     auth: {
-      user: ENV.gmailUser,
-      pass: ENV.gmailAppPassword,
+      user: ENV.emailUser,
+      pass: ENV.emailPassword,
     },
   });
-
   return _transporter;
 }
 
-/**
- * Send a transactional email via Gmail SMTP using nodemailer.
- * Returns true on success, false on failure (never throws).
- */
 export async function sendEmail(payload: EmailPayload): Promise<boolean> {
   const transporter = getTransporter();
   if (!transporter) return false;
-
   try {
     const info = await transporter.sendMail({
-      from: `"Tutoring Referral Manager" <${ENV.gmailUser}>`,
+      from: `"Tutoring Referral Manager" <${ENV.emailFrom}>`,
       to: payload.to,
       subject: payload.subject,
       html: payload.html,
       text: payload.text ?? payload.subject,
     });
-
     console.log(`[Email] Sent to ${payload.to} — messageId: ${info.messageId}`);
     return true;
   } catch (error: unknown) {

@@ -1,6 +1,6 @@
 import { and, count, desc, eq, gte, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, appSettings, parents, productEnrollments, productPromotions, products, promoTemplates, promoterCredentials, promoterInvites, referralLinkVisits, referrals, students, users } from "../drizzle/schema";
+import { InsertUser, appSettings, parents, productEnrollments, productPromotions, products, promoTemplates, promoterCredentials, promoterInvites, referralLinkVisits, referrals, students, users, promoCodes } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -436,6 +436,9 @@ export async function createProduct(data: {
   price?: string;
   category?: string;
   referralFeeOverride?: string | null;
+  currency?: string;
+  promoterCommission?: string | null;
+  adminCommission?: string | null;
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -445,7 +448,7 @@ export async function createProduct(data: {
 
 export async function updateProduct(
   id: number,
-  data: { name?: string; description?: string; price?: string; category?: string; active?: boolean; templateId?: number | null; referralFeeOverride?: string | null }
+  data: { name?: string; description?: string; price?: string; category?: string; active?: boolean; templateId?: number | null; referralFeeOverride?: string | null; currency?: string; promoterCommission?: string | null; adminCommission?: string | null }
 ) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -680,4 +683,38 @@ export async function upsertSetting(key: SettingKey, value: string): Promise<voi
     .insert(appSettings)
     .values({ key, value })
     .onDuplicateKeyUpdate({ set: { value } });
+}
+
+// ─── Promo Codes ─────────────────────────────────────────────────────────────
+
+export async function createPromoCode(data: {
+  parentId: number;
+  studentId: number;
+  promoterId: number;
+  promotionId?: number;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const code = "EDK-" + Math.random().toString(36).substring(2, 8).toUpperCase();
+  await db.insert(promoCodes).values({ ...data, code, discount: "10.00", status: "active" });
+  return code;
+}
+
+export async function getPromoCodeByPromotion(promotionId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const results = await db.select().from(promoCodes).where(eq(promoCodes.promotionId, promotionId));
+  return results[0] ?? null;
+}
+
+export async function getPromoCodesByParent(parentId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(promoCodes).where(eq(promoCodes.parentId, parentId));
+}
+
+export async function getPromoCodesByPromoter(promoterId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(promoCodes).where(eq(promoCodes.promoterId, promoterId)).orderBy(desc(promoCodes.createdAt));
 }

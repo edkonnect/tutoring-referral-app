@@ -12,7 +12,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import {
+import { Percent, 
   Select,
   SelectContent,
   SelectItem,
@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import {
+import { Percent, 
   Plus, Pencil, Trash2, Package, DollarSign, Tag, Loader2, Search,
   CheckCircle, XCircle, BarChart2, Eye, ChevronRight, LayoutTemplate,
 } from "lucide-react";
@@ -33,9 +33,12 @@ type ProductForm = {
   active: boolean;
   templateId: number | null;
   referralFeeOverride: string;
+  promoterCommission: string;
+  adminCommission: string;
+  currency: string;
 };
 
-const EMPTY_FORM: ProductForm = { name: "", description: "", price: "", category: "", active: true, templateId: null, referralFeeOverride: "" };
+const EMPTY_FORM: ProductForm = { name: "", description: "", price: "", category: "", active: true, templateId: null, referralFeeOverride: "", promoterCommission: "", adminCommission: "", currency: "USD" };
 
 type Product = {
   id: number;
@@ -46,6 +49,8 @@ type Product = {
   active: boolean;
   templateId: number | null;
   referralFeeOverride: string | null;
+  promoterCommission: string | null;
+  adminCommission: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -138,6 +143,9 @@ export default function AdminProducts() {
       active: p.active,
       templateId: p.templateId ?? null,
       referralFeeOverride: p.referralFeeOverride ?? "",
+      promoterCommission: p.promoterCommission ?? "",
+      adminCommission: p.adminCommission ?? "",
+      currency: (p as any).currency ?? "USD",
     });
   }
 
@@ -276,6 +284,8 @@ export default function AdminProducts() {
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Product</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Category</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Price</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">Promoter Commission</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">Admin Commission</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Status</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Active</th>
                   <th className="text-right px-4 py-3 font-medium text-gray-600">Actions</th>
@@ -307,13 +317,23 @@ export default function AdminProducts() {
                     </td>
                     <td className="px-4 py-3 font-medium text-gray-900">
                       {product.price
-                        ? <span className="flex items-center gap-1"><DollarSign className="w-3 h-3 text-green-600" />{Number(product.price).toFixed(2)}</span>
+                        ? <span className="flex items-center gap-1">{(product as any).currency === 'INR' ? '₹' : '$'}{Number(product.price).toFixed(2)}</span>
                         : <span className="text-gray-300">—</span>}
                       {product.referralFeeOverride != null && (
                         <span className="flex items-center gap-0.5 text-xs text-amber-600 mt-0.5">
                           <DollarSign className="w-2.5 h-2.5" />{Number(product.referralFeeOverride).toFixed(2)} fee
                         </span>
                       )}
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      {product.promoterCommission != null && product.price != null
+                        ? <span className="font-medium text-indigo-600">${(Number(product.price) * Number(product.promoterCommission) / 100).toFixed(2)} <span className="text-xs text-gray-400">({Number(product.promoterCommission)}%)</span></span>
+                        : <span className="text-gray-400">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      {product.adminCommission != null && product.price != null
+                        ? <span className="font-medium text-purple-600">${(Number(product.price) * Number(product.adminCommission) / 100).toFixed(2)} <span className="text-xs text-gray-400">({Number(product.adminCommission)}%)</span></span>
+                        : <span className="text-gray-400">—</span>}
                     </td>
                     <td className="px-4 py-3">
                       {product.active ? (
@@ -397,6 +417,9 @@ export default function AdminProducts() {
                   price: form.price || undefined,
                   category: form.category || undefined,
                   referralFeeOverride: form.referralFeeOverride || null,
+                  promoterCommission: form.promoterCommission || null,
+                  adminCommission: form.adminCommission || null,
+                  currency: form.currency || "USD",
                 })
               }
               disabled={!form.name.trim() || createMutation.isPending}
@@ -438,6 +461,9 @@ export default function AdminProducts() {
                       active: editProduct.active,
                       templateId: editProduct.templateId ?? null,
                       referralFeeOverride: editProduct.referralFeeOverride || null,
+                      promoterCommission: editProduct.promoterCommission || null,
+                      adminCommission: editProduct.adminCommission || null,
+                      currency: editProduct.currency || "USD",
                     })
                   }
                   disabled={!editProduct.name.trim() || updateMutation.isPending}
@@ -513,7 +539,7 @@ export default function AdminProducts() {
                   <div>
                     <p className="text-xs text-gray-500">Price</p>
                     <p className="font-semibold text-gray-900">
-                      {viewProduct.price ? `$${Number(viewProduct.price).toFixed(2)}` : "Not set"}
+                      {viewProduct.price ? `${(viewProduct as any).currency === "INR" ? "₹" : "$"}${Number(viewProduct.price).toFixed(2)}` : "Not set"}
                     </p>
                   </div>
                 </div>
@@ -535,7 +561,7 @@ export default function AdminProducts() {
                     <p className="text-xs text-gray-500">Referral Fee</p>
                     <p className="font-semibold text-gray-900 text-sm">
                       {viewProduct.referralFeeOverride != null
-                        ? <span className="text-amber-700">${Number(viewProduct.referralFeeOverride).toFixed(2)} <span className="text-xs font-normal text-gray-400">(custom)</span></span>
+                        ? <span className="text-amber-700">{(viewProduct as any).currency === "INR" ? "₹" : "$"}{Number(viewProduct.referralFeeOverride).toFixed(2)} <span className="text-xs font-normal text-gray-400">(custom)</span></span>
                         : <span className="text-gray-400">Uses global default</span>}
                     </p>
                   </div>
@@ -641,9 +667,21 @@ function ProductFormFields({
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1.5">
-          <Label htmlFor="product-price">Price ($)</Label>
+          <Label htmlFor="product-currency">Currency</Label>
+          <Select value={form.currency} onValueChange={(v) => onChange({ ...form, currency: v })}>
+            <SelectTrigger id="product-currency">
+              <SelectValue placeholder="Select currency" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="USD">$ USD</SelectItem>
+              <SelectItem value="INR">₹ INR</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="product-price">Price</Label>
           <div className="relative">
-            <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">{form.currency === "INR" ? "₹" : "$"}</span>
             <Input
               id="product-price"
               placeholder="0.00"
@@ -656,18 +694,18 @@ function ProductFormFields({
             />
           </div>
         </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="product-category">Category</Label>
-          <div className="relative">
-            <Tag className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-            <Input
-              id="product-category"
-              placeholder="e.g. Math, Science"
-              value={form.category}
-              onChange={(e) => onChange({ ...form, category: e.target.value })}
-              className="pl-8"
-            />
-          </div>
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="product-category">Category</Label>
+        <div className="relative">
+          <Tag className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+          <Input
+            id="product-category"
+            placeholder="e.g. Math, Science"
+            value={form.category}
+            onChange={(e) => onChange({ ...form, category: e.target.value })}
+            className="pl-8"
+          />
         </div>
       </div>
       {/* Referral Fee Override */}
@@ -686,10 +724,30 @@ function ProductFormFields({
             step="0.01"
             value={form.referralFeeOverride}
             onChange={(e) => onChange({ ...form, referralFeeOverride: e.target.value })}
-            className="pl-8"
           />
+          <p className="text-xs text-gray-400 mt-1">Overrides the global referral fee for this product only. Leave blank to use the default.</p>
         </div>
-        <p className="text-xs text-gray-400">Overrides the global referral fee for this product only. Leave blank to use the default.</p>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-sm font-medium text-gray-700 flex items-center gap-1.5 mb-1"><Percent className="w-3.5 h-3.5 text-indigo-500" />Promoter Commission %</label>
+            <Input
+              type="number"
+              placeholder="e.g. 5"
+              value={form.promoterCommission}
+              onChange={(e) => onChange({ ...form, promoterCommission: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700 flex items-center gap-1.5 mb-1"><Percent className="w-3.5 h-3.5 text-purple-500" />Admin Commission %</label>
+            <Input
+              type="number"
+              placeholder="e.g. 5"
+              value={form.adminCommission}
+              onChange={(e) => onChange({ ...form, adminCommission: e.target.value })}
+            />
+          </div>
+        </div>
+
       </div>
 
       {/* Template selector */}

@@ -26,9 +26,10 @@ import {
   GraduationCap,
   Pencil,
   Save,
+  Search,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { toast } from "sonner";
 
 const GRADE_LEVELS = [
@@ -58,6 +59,8 @@ export default function AdminStudents() {
 
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [appliedQuery, setAppliedQuery] = useState("");
   const [editForm, setEditForm] = useState({
     name: "",
     lastName: "",
@@ -71,7 +74,6 @@ export default function AdminStudents() {
       utils.students.listAll.invalidate();
       toast.success("Student information updated");
       setIsEditing(false);
-      // Update the selected student in the slide-over
       if (selectedStudent) {
         setSelectedStudent({
           ...selectedStudent,
@@ -110,15 +112,55 @@ export default function AdminStudents() {
   const fullName = (s: Student) =>
     [s.name, s.lastName].filter(Boolean).join(" ");
 
+  const filteredStudents = useMemo(() => {
+    const q = appliedQuery.toLowerCase().trim();
+    if (!q || !students) return students;
+    return students.filter((s) => {
+      const name = fullName(s as Student).toLowerCase();
+      const promoter = getPromoterName(s.parentId).toLowerCase();
+      return name.includes(q) || promoter.includes(q);
+    });
+  }, [students, appliedQuery, parents, promoters]);
+
+  function handleSearch() { setAppliedQuery(searchQuery); }
+  function handleClear() { setSearchQuery(""); setAppliedQuery(""); }
+
   return (
     <DashboardLayout>
       <div className="max-w-6xl mx-auto">
         <div className="mb-8">
           <h1 className="text-2xl font-semibold text-foreground">All Students</h1>
-          <p className="text-muted-foreground mt-1">
-            All students across all promoters and parents
-          </p>
+          <p className="text-muted-foreground mt-1">All students across all promoters and parents</p>
         </div>
+
+        <div className="flex gap-2 mb-6">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Input
+              placeholder="Search by student name or promoter..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              className="pl-9"
+            />
+          </div>
+          <Button onClick={handleSearch} className="gap-2">
+            <Search className="w-4 h-4" />
+            Search
+          </Button>
+          {appliedQuery && (
+            <Button variant="outline" onClick={handleClear} className="gap-2">
+              <X className="w-4 h-4" />
+              Clear
+            </Button>
+          )}
+        </div>
+
+        {appliedQuery && (
+          <p className="text-sm text-muted-foreground mb-4">
+            Showing {filteredStudents?.length ?? 0} result{filteredStudents?.length !== 1 ? "s" : ""} for "<strong>{appliedQuery}</strong>"
+          </p>
+        )}
 
         {isLoading ? (
           <div className="grid gap-3">
@@ -126,13 +168,15 @@ export default function AdminStudents() {
               <div key={i} className="h-16 bg-muted animate-pulse rounded-lg" />
             ))}
           </div>
-        ) : !students?.length ? (
+        ) : !filteredStudents?.length ? (
           <Card className="border-dashed">
             <CardContent className="flex flex-col items-center justify-center py-16 text-center">
               <GraduationCap className="h-10 w-10 text-muted-foreground mb-3" />
-              <p className="font-medium text-foreground">No students yet</p>
+              <p className="font-medium text-foreground">
+                {appliedQuery ? "No students match your search" : "No students yet"}
+              </p>
               <p className="text-sm text-muted-foreground mt-1">
-                Students will appear here once they register via a promotion link.
+                {appliedQuery ? "Try a different name or promoter." : "Students will appear here once they register via a promotion link."}
               </p>
             </CardContent>
           </Card>
@@ -152,15 +196,9 @@ export default function AdminStudents() {
                   </tr>
                 </thead>
                 <tbody>
-                  {students.map((s) => (
-                    <tr
-                      key={s.id}
-                      className="border-b last:border-0 hover:bg-muted/20 transition-colors cursor-pointer"
-                      onClick={() => openStudent(s as Student)}
-                    >
-                      <td className="px-4 py-3 font-medium text-foreground">
-                        {fullName(s as Student) || "—"}
-                      </td>
+                  {filteredStudents.map((s) => (
+                    <tr key={s.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors cursor-pointer" onClick={() => openStudent(s as Student)}>
+                      <td className="px-4 py-3 font-medium text-foreground">{fullName(s as Student) || "—"}</td>
                       <td className="px-4 py-3 text-muted-foreground">{getParentName(s.parentId)}</td>
                       <td className="px-4 py-3">
                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
@@ -168,9 +206,7 @@ export default function AdminStudents() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-muted-foreground">
-                        {s.gradeLevel ? (
-                          <Badge variant="secondary" className="font-normal">{s.gradeLevel}</Badge>
-                        ) : "—"}
+                        {s.gradeLevel ? <Badge variant="secondary" className="font-normal">{s.gradeLevel}</Badge> : "—"}
                       </td>
                       <td className="px-4 py-3 text-muted-foreground max-w-xs">
                         {(s as Student).educationGoals ? (
@@ -182,25 +218,16 @@ export default function AdminStudents() {
                       <td className="px-4 py-3">
                         {s.enrolled ? (
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
-                            <CheckCircle className="h-3 w-3" />
-                            Enrolled
+                            <CheckCircle className="h-3 w-3" />Enrolled
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                            <Clock className="h-3 w-3" />
-                            Pending
+                            <Clock className="h-3 w-3" />Pending
                           </span>
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 px-2 text-xs"
-                          onClick={(e) => { e.stopPropagation(); openStudent(s as Student); }}
-                        >
-                          View
-                        </Button>
+                        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={(e) => { e.stopPropagation(); openStudent(s as Student); }}>View</Button>
                       </td>
                     </tr>
                   ))}
@@ -211,7 +238,6 @@ export default function AdminStudents() {
         )}
       </div>
 
-      {/* Student Detail Slide-over */}
       <Sheet open={!!selectedStudent} onOpenChange={(open) => { if (!open) { setSelectedStudent(null); setIsEditing(false); } }}>
         <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
           {selectedStudent && (
@@ -224,132 +250,58 @@ export default function AdminStudents() {
               </SheetHeader>
 
               {isEditing ? (
-                /* Edit form */
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
                       <Label htmlFor="edit-fname">First Name</Label>
-                      <Input
-                        id="edit-fname"
-                        value={editForm.name}
-                        onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
-                        placeholder="First name"
-                      />
+                      <Input id="edit-fname" value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))} placeholder="First name" />
                     </div>
                     <div className="space-y-1.5">
                       <Label htmlFor="edit-lname">Last Name</Label>
-                      <Input
-                        id="edit-lname"
-                        value={editForm.lastName}
-                        onChange={(e) => setEditForm((f) => ({ ...f, lastName: e.target.value }))}
-                        placeholder="Last name"
-                      />
+                      <Input id="edit-lname" value={editForm.lastName} onChange={(e) => setEditForm((f) => ({ ...f, lastName: e.target.value }))} placeholder="Last name" />
                     </div>
                   </div>
-
                   <div className="space-y-1.5">
                     <Label>Grade Level</Label>
-                    <Select
-                      value={editForm.gradeLevel}
-                      onValueChange={(v) => setEditForm((f) => ({ ...f, gradeLevel: v }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select grade level" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {GRADE_LEVELS.map((g) => (
-                          <SelectItem key={g} value={g}>{g}</SelectItem>
-                        ))}
-                      </SelectContent>
+                    <Select value={editForm.gradeLevel} onValueChange={(v) => setEditForm((f) => ({ ...f, gradeLevel: v }))}>
+                      <SelectTrigger><SelectValue placeholder="Select grade level" /></SelectTrigger>
+                      <SelectContent>{GRADE_LEVELS.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
-
                   <div className="space-y-1.5">
                     <Label htmlFor="edit-goals">Education Goals</Label>
-                    <Textarea
-                      id="edit-goals"
-                      value={editForm.educationGoals}
-                      onChange={(e) => setEditForm((f) => ({ ...f, educationGoals: e.target.value }))}
-                      placeholder="Describe the student's education goals..."
-                      rows={4}
-                    />
+                    <Textarea id="edit-goals" value={editForm.educationGoals} onChange={(e) => setEditForm((f) => ({ ...f, educationGoals: e.target.value }))} placeholder="Describe the student's education goals..." rows={4} />
                   </div>
-
                   <div className="space-y-1.5">
                     <Label htmlFor="edit-subjects">Subjects</Label>
-                    <Input
-                      id="edit-subjects"
-                      value={editForm.subjects}
-                      onChange={(e) => setEditForm((f) => ({ ...f, subjects: e.target.value }))}
-                      placeholder="e.g. Math, Science"
-                    />
+                    <Input id="edit-subjects" value={editForm.subjects} onChange={(e) => setEditForm((f) => ({ ...f, subjects: e.target.value }))} placeholder="e.g. Math, Science" />
                   </div>
-
                   <div className="flex gap-2 pt-2">
-                    <Button
-                      className="flex-1 gap-2"
-                      onClick={() => updateMutation.mutate({
-                        id: selectedStudent.id,
-                        name: editForm.name || undefined,
-                        lastName: editForm.lastName || undefined,
-                        gradeLevel: editForm.gradeLevel || undefined,
-                        educationGoals: editForm.educationGoals || undefined,
-                        subjects: editForm.subjects || undefined,
-                      })}
-                      disabled={updateMutation.isPending}
-                    >
-                      <Save className="h-4 w-4" />
-                      {updateMutation.isPending ? "Saving..." : "Save Changes"}
+                    <Button className="flex-1 gap-2" onClick={() => updateMutation.mutate({ id: selectedStudent.id, name: editForm.name || undefined, lastName: editForm.lastName || undefined, gradeLevel: editForm.gradeLevel || undefined, educationGoals: editForm.educationGoals || undefined, subjects: editForm.subjects || undefined })} disabled={updateMutation.isPending}>
+                      <Save className="h-4 w-4" />{updateMutation.isPending ? "Saving..." : "Save Changes"}
                     </Button>
-                    <Button variant="outline" onClick={() => setIsEditing(false)} className="gap-2">
-                      <X className="h-4 w-4" />
-                      Cancel
-                    </Button>
+                    <Button variant="outline" onClick={() => setIsEditing(false)} className="gap-2"><X className="h-4 w-4" />Cancel</Button>
                   </div>
                 </div>
               ) : (
-                /* Read-only view */
                 <div className="space-y-5">
-                  {/* Header card */}
                   <div className="p-4 bg-muted/40 rounded-lg border">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="text-lg font-semibold text-foreground">
-                          {fullName(selectedStudent) || selectedStudent.name}
-                        </p>
-                        <p className="text-sm text-muted-foreground mt-0.5">
-                          Parent: {getParentName(selectedStudent.parentId)}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          Promoter: {getPromoterName(selectedStudent.parentId)}
-                        </p>
+                        <p className="text-lg font-semibold text-foreground">{fullName(selectedStudent) || selectedStudent.name}</p>
+                        <p className="text-sm text-muted-foreground mt-0.5">Parent: {getParentName(selectedStudent.parentId)}</p>
+                        <p className="text-sm text-muted-foreground">Promoter: {getPromoterName(selectedStudent.parentId)}</p>
                       </div>
                       <div className="flex flex-col items-end gap-2">
                         {selectedStudent.enrolled ? (
-                          <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-0">
-                            <CheckCircle className="h-3 w-3 mr-1" />
-                            Enrolled
-                          </Badge>
+                          <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-0"><CheckCircle className="h-3 w-3 mr-1" />Enrolled</Badge>
                         ) : (
-                          <Badge variant="secondary">
-                            <Clock className="h-3 w-3 mr-1" />
-                            Pending
-                          </Badge>
+                          <Badge variant="secondary"><Clock className="h-3 w-3 mr-1" />Pending</Badge>
                         )}
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="gap-1.5 h-7 text-xs"
-                          onClick={() => setIsEditing(true)}
-                        >
-                          <Pencil className="h-3 w-3" />
-                          Edit
-                        </Button>
+                        <Button size="sm" variant="outline" className="gap-1.5 h-7 text-xs" onClick={() => setIsEditing(true)}><Pencil className="h-3 w-3" />Edit</Button>
                       </div>
                     </div>
                   </div>
-
-                  {/* Student info fields */}
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div>
@@ -361,51 +313,31 @@ export default function AdminStudents() {
                         <p className="text-sm font-medium text-foreground">{selectedStudent.lastName || "—"}</p>
                       </div>
                     </div>
-
                     <div>
                       <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Grade Level</p>
-                      {selectedStudent.gradeLevel ? (
-                        <Badge variant="secondary">{selectedStudent.gradeLevel}</Badge>
-                      ) : (
-                        <p className="text-sm text-muted-foreground italic">Not provided</p>
-                      )}
+                      {selectedStudent.gradeLevel ? <Badge variant="secondary">{selectedStudent.gradeLevel}</Badge> : <p className="text-sm text-muted-foreground italic">Not provided</p>}
                     </div>
-
                     <div>
-                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
-                        <BookOpen className="h-3.5 w-3.5" />
-                        Education Goals
-                      </p>
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5 flex items-center gap-1.5"><BookOpen className="h-3.5 w-3.5" />Education Goals</p>
                       {selectedStudent.educationGoals ? (
-                        <div className="p-3 bg-blue-50 border border-blue-100 rounded-md text-sm text-foreground leading-relaxed">
-                          {selectedStudent.educationGoals}
-                        </div>
-                      ) : (
-                        <p className="text-sm text-muted-foreground italic">Not provided</p>
-                      )}
+                        <div className="p-3 bg-blue-50 border border-blue-100 rounded-md text-sm text-foreground leading-relaxed">{selectedStudent.educationGoals}</div>
+                      ) : <p className="text-sm text-muted-foreground italic">Not provided</p>}
                     </div>
-
                     {selectedStudent.subjects && (
                       <div>
                         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Subjects</p>
                         <p className="text-sm text-foreground">{selectedStudent.subjects}</p>
                       </div>
                     )}
-
                     {selectedStudent.age && (
                       <div>
                         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Age</p>
                         <p className="text-sm text-foreground">{selectedStudent.age}</p>
                       </div>
                     )}
-
                     <div>
                       <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Registered On</p>
-                      <p className="text-sm text-foreground">
-                        {new Date(selectedStudent.createdAt).toLocaleDateString(undefined, {
-                          year: "numeric", month: "long", day: "numeric",
-                        })}
-                      </p>
+                      <p className="text-sm text-foreground">{new Date(selectedStudent.createdAt).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })}</p>
                     </div>
                   </div>
                 </div>

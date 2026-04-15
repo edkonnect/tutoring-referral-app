@@ -61,6 +61,10 @@ import {
   getProductWithTemplate,
   getPromotionByEnrollmentToken,
   getAllSettings,
+  createPromoCode,
+  getPromoCodesByParent,
+  getPromoCodesByPromoter,
+  getPromoCodeByPromotion,
   upsertSetting,
   getSetting,
   SETTING_KEYS,
@@ -801,6 +805,9 @@ const productsRouter = router({
         price: z.string().optional(),
         category: z.string().optional(),
         referralFeeOverride: z.string().nullable().optional(),
+        promoterCommission: z.string().nullable().optional(),
+        adminCommission: z.string().nullable().optional(),
+        currency: z.string().default("USD"),
       })
     )
     .mutation(async ({ input }) => {
@@ -819,6 +826,9 @@ const productsRouter = router({
         active: z.boolean().optional(),
         templateId: z.number().nullable().optional(),
         referralFeeOverride: z.string().nullable().optional(),
+        promoterCommission: z.string().nullable().optional(),
+        adminCommission: z.string().nullable().optional(),
+        currency: z.string().optional(),
       })
     )
     .mutation(async ({ input }) => {
@@ -985,12 +995,16 @@ const productPromotionsRouter = router({
     // Enrich with product and parent info
     const enriched = await Promise.all(
       promotions.map(async (promo) => {
-        const [product, parent, enrollment] = await Promise.all([
+        const [product, parent, enrollment, students, existingPromo] = await Promise.all([
           getProductById(promo.productId),
           getParentById(promo.parentId),
           getProductEnrollmentByPromotionId(promo.id),
+          getStudentsByParent(promo.parentId),
+          getPromoCodeByPromotion(promo.id),
         ]);
-        return { ...promo, product, parent, enrollment };
+        const promoSent = !!existingPromo;
+        const promoCode = existingPromo?.code ?? null;
+        return { ...promo, product, parent, enrollment, students, promoSent, promoCode };
       })
     );
     return enriched;
@@ -1261,6 +1275,62 @@ const promoTemplatesRouter = router({
     .query(async ({ input }) => getProductWithTemplate(input.productId)),
 });
 
+
+// ─── Promo Codes Router ───────────────────────────────────────────────────────
+
+const promoCodesRouter = router({
+  generate: promoterProcedure
+    .input(z.object({
+      promoId: z.number(),
+      parentId: z.number(),
+      studentId: z.number(),
+      promoterId: z.number(),
+      productName: z.string(),
+      parentEmail: z.string(),
+      parentName: z.string(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const code = await createPromoCode({
+        parentId: input.parentId,
+        studentId: input.studentId,
+        promoterId: ctx.user.id,
+        promotionId: input.promoId,
+      });
+      await sendEmail({
+        to: input.parentEmail,
+        subject: `Your Exclusive Promo Code for ${input.productName}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
+            <div style="background: #4f46e5; padding: 24px; border-radius: 8px 8px 0 0; text-align: center;">
+              <h1 style="color: #fff; margin: 0; font-size: 24px;">Your Promo Code</h1>
+            </div>
+            <div style="background: #f9fafb; padding: 24px; border-radius: 0 0 8px 8px; border: 1px solid #e5e7eb;">
+              <p style="font-size: 16px;">Hi <strong>${input.parentName}</strong>,</p>
+              <p style="font-size: 16px;">You have received an exclusive promo code for <strong>${input.productName}</strong>.</p>
+              <div style="background: #ede9fe; border: 1px solid #a5b4fc; border-radius: 8px; padding: 16px; margin: 20px 0; text-align: center;">
+                <p style="margin: 0; font-size: 14px; color: #4f46e5;">Your Promo Code</p>
+                <p style="margin: 8px 0 0; font-size: 36px; font-weight: bold; color: #4f46e5; letter-spacing: 4px;">${code}</p>
+                <p style="margin: 4px 0 0; font-size: 12px; color: #6366f1;">Use this code to get 10% discount when enrolling</p>
+              </div>
+              <div style="text-align: center; margin-top: 20px;"><a href="https://edkonnect-academy.com/" style="background: #4f46e5; color: #fff; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-size: 16px; font-weight: bold;">Login to Edkonnect</a></div>
+            </div>
+          </div>
+        `,
+      });
+      return { success: true, code };
+    }),
+
+  listByParent: adminProcedure
+    .input(z.object({ parentId: z.number() }))
+    .query(async ({ input }) => {
+      return getPromoCodesByParent(input.parentId);
+    }),
+
+  myList: promoterProcedure.query(async ({ ctx }) => {
+    return getPromoCodesByPromoter(ctx.user.id);
+  }),
+});
+
 export const appRouter = router({
   system: systemRouter,
   auth: router({
@@ -1281,6 +1351,8 @@ export const appRouter = router({
   products: productsRouter,
   productPromotions: productPromotionsRouter,
   promoTemplates: promoTemplatesRouter,
+  promoCodes: promoCodesRouter,
 });
 
 export type AppRouter = typeof appRouter;
+

@@ -12,20 +12,35 @@ let _transporter: nodemailer.Transporter | null = null;
 
 function getTransporter(): nodemailer.Transporter | null {
   if (_transporter) return _transporter;
-  if (!ENV.emailHost || !ENV.emailUser || !ENV.emailPassword) {
-    console.warn("[Email] SMTP credentials not configured");
-    return null;
+
+  if (ENV.emailHost && ENV.emailUser && ENV.emailPassword) {
+    _transporter = nodemailer.createTransport({
+      host: ENV.emailHost,
+      port: ENV.emailPort,
+      secure: ENV.emailPort === 465,
+      auth: {
+        user: ENV.emailUser,
+        pass: ENV.emailPassword,
+      },
+    });
+
+    return _transporter;
   }
-  _transporter = nodemailer.createTransport({
-    host: ENV.emailHost,
-    port: ENV.emailPort,
-    secure: false,
-    auth: {
-      user: ENV.emailUser,
-      pass: ENV.emailPassword,
-    },
-  });
-  return _transporter;
+
+  if (ENV.gmailUser && ENV.gmailAppPassword) {
+    _transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: ENV.gmailUser,
+        pass: ENV.gmailAppPassword,
+      },
+    });
+
+    return _transporter;
+  }
+
+  console.warn("[Email] SMTP credentials not configured (EMAIL_* or GMAIL_* missing)");
+  return null;
 }
 
 export async function sendEmail(payload: EmailPayload): Promise<boolean> {
@@ -33,7 +48,11 @@ export async function sendEmail(payload: EmailPayload): Promise<boolean> {
   if (!transporter) return false;
   try {
     const info = await transporter.sendMail({
-      from: `"Tutoring Referral Manager" <${ENV.emailFrom}>`,
+      from:
+        ENV.emailFrom ||
+        ENV.gmailUser ||
+        ENV.emailUser ||
+        "no-reply@localhost",
       to: payload.to,
       subject: payload.subject,
       html: payload.html,

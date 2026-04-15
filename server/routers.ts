@@ -23,6 +23,7 @@ import {
   getStudentsByParent,
   getStudentsByPromoter,
   getUserById,
+  getUserByEmail,
   getAllPromoterVisitStats,
   getReferralVisitStats,
   getUserByReferralToken,
@@ -37,6 +38,7 @@ import {
   markInviteUsed,
   createCredentials,
   getCredentialsByEmail,
+  upsertPromoterProfile,
   getAllProducts,
   getProductById,
   createProduct,
@@ -91,6 +93,126 @@ const promoterProcedure = protectedProcedure.use(({ ctx, next }) => {
   }
   return next({ ctx });
 });
+
+const INVITE_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
+
+function resolveAppOrigin(
+  ctx: { req: { headers: Record<string, unknown>; protocol?: string; }; },
+  origin?: string
+) {
+  if (origin) return origin;
+
+  const forwardedHost = ctx.req.headers["x-forwarded-host"];
+  if (typeof forwardedHost === "string" && forwardedHost.length > 0) {
+    return `https://${forwardedHost}`;
+  }
+
+  const host = ctx.req.headers.host;
+  if (typeof host === "string" && host.length > 0) {
+    return `${ctx.req.protocol ?? "http"}://${host}`;
+  }
+
+  return "http://localhost:3001";
+}
+
+function buildPromoterSetupEmail(args: {
+  promoterName: string;
+  setupUrl: string;
+  variant: "invite" | "signup" | "resend";
+}) {
+  const { promoterName, setupUrl, variant } = args;
+
+  const copy =
+    variant === "signup"
+      ? {
+          subject: "Complete your Tutoring Referral Program signup",
+          title: "Finish Your Signup",
+          intro:
+            "Thanks for signing up to become a promoter. Use the link below to create your password and activate your account.",
+          buttonLabel: "Create My Password",
+        }
+      : variant === "resend"
+        ? {
+            subject: "Your updated Tutoring Referral Program setup link",
+            title: "Your Setup Link",
+            intro:
+              "Here is your new account setup link. Use it to create your password and access your promoter dashboard.",
+            buttonLabel: "Set Up My Account",
+          }
+        : {
+            subject: "Welcome! Set up your Tutoring Referral Program account",
+            title: "You're Invited",
+            intro:
+              "You have been added as a promoter for our tutoring referral program. Create your account to access your dashboard and start earning referral credits.",
+            buttonLabel: "Create My Account",
+          };
+
+  return {
+    subject: copy.subject,
+    text: `Hi ${promoterName},\n\n${copy.intro}\n\n${setupUrl}\n\nThis link expires in 7 days.`,
+    html: `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:'Segoe UI',Arial,sans-serif;">
+  <div style="max-width:580px;margin:40px auto;background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.10);">
+    <div style="background:linear-gradient(135deg,#1e3a8a 0%,#2563eb 100%);padding:36px 40px 28px;text-align:center;">
+      <div style="display:inline-block;background:rgba(255,255,255,0.15);border-radius:50%;padding:14px;margin-bottom:14px;">
+        <span style="font-size:32px;">&#127891;</span>
+      </div>
+      <h1 style="margin:0;color:#ffffff;font-size:26px;font-weight:700;letter-spacing:-0.3px;">${copy.title}</h1>
+      <p style="margin:8px 0 0;color:#bfdbfe;font-size:15px;">Tutoring Referral Program</p>
+    </div>
+    <div style="padding:36px 40px;">
+      <p style="margin:0 0 12px;color:#0f172a;font-size:16px;">Hi <strong>${promoterName}</strong>,</p>
+      <p style="margin:0 0 20px;color:#475569;font-size:15px;line-height:1.6;">${copy.intro}</p>
+      <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:18px 22px;margin-bottom:24px;text-align:center;">
+        <div style="font-size:28px;font-weight:800;color:#1d4ed8;">$50</div>
+        <div style="font-size:12px;color:#3b82f6;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Per Student Enrolled</div>
+      </div>
+      <div style="text-align:center;margin:28px 0;">
+        <a href="${setupUrl}" style="display:inline-block;background:linear-gradient(135deg,#1e3a8a,#2563eb);color:#ffffff;padding:15px 36px;border-radius:8px;text-decoration:none;font-size:16px;font-weight:700;letter-spacing:0.2px;box-shadow:0 4px 12px rgba(37,99,235,0.35);">${copy.buttonLabel} &rarr;</a>
+      </div>
+      <p style="font-size:12px;color:#94a3b8;margin:0;">Can't click the button? Copy this link into your browser:<br/><a href="${setupUrl}" style="color:#2563eb;word-break:break-all;">${setupUrl}</a></p>
+    </div>
+    <div style="background:#f1f5f9;padding:18px 40px;text-align:center;border-top:1px solid #e2e8f0;">
+      <p style="margin:0 0 4px;color:#64748b;font-size:12px;font-weight:600;">Tutoring Referral Manager</p>
+      <p style="margin:0;color:#94a3b8;font-size:11px;">This link expires in <strong>7 days</strong>.</p>
+    </div>
+  </div>
+</body>
+</html>`,
+  };
+}
+
+async function issuePromoterSetupInvite(args: {
+  userId: number;
+  promoterName: string;
+  email: string;
+  ctx: { req: { headers: Record<string, unknown>; protocol?: string; }; };
+  origin?: string;
+  variant: "invite" | "signup" | "resend";
+}) {
+  const { nanoid } = await import("nanoid");
+  const token = nanoid(48);
+  const expiresAt = new Date(Date.now() + INVITE_EXPIRY_MS);
+  await createInvite(args.userId, token, expiresAt);
+
+  const setupUrl = `${resolveAppOrigin(args.ctx, args.origin)}/setup/${token}`;
+  const emailPayload = buildPromoterSetupEmail({
+    promoterName: args.promoterName,
+    setupUrl,
+    variant: args.variant,
+  });
+  const sent = await sendEmail({
+    to: args.email,
+    subject: emailPayload.subject,
+    text: emailPayload.text,
+    html: emailPayload.html,
+  });
+
+  return { sent, setupUrl };
+}
 
 // ─── Parents Router ───────────────────────────────────────────────────────────
 
@@ -335,92 +457,22 @@ const adminRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       await createPromoter({ name: input.name, email: input.email });
-      // Get the newly created user
-      const allPromoters = await getAllPromoters();
-      const newPromoter = allPromoters.find((p) => p.email === input.email);
+      const newPromoter = await getUserByEmail(input.email);
       if (!newPromoter) return { success: true };
 
-      // Generate invite token (expires in 7 days)
-      const { nanoid } = await import("nanoid");
-      const token = nanoid(48);
-      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-      await createInvite(newPromoter.id, token, expiresAt);
-
-      // Build setup URL
-      const origin =
-        input.origin ||
-        (ctx.req.headers["x-forwarded-host"]
-          ? `https://${ctx.req.headers["x-forwarded-host"]}`
-          : `${ctx.req.protocol}://${ctx.req.headers.host}`);
-      const setupUrl = `${origin}/setup/${token}`;
-
-      // Send registration/welcome email
-      try {
-        await sendEmail({
-          to: input.email,
-          subject: `Welcome! Set up your Tutoring Referral Program account`,
-          text: `Hi ${input.name},\n\nYou have been added as a promoter for the Tutoring Referral Program. Click the link below to create your account and set your password:\n\n${setupUrl}\n\nThis link expires in 7 days.\n\nOnce your account is active you can start referring parents and earning $50 for every student who enrolls.`,
-          html: `
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#f1f5f9;font-family:'Segoe UI',Arial,sans-serif;">
-  <div style="max-width:580px;margin:40px auto;background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.10);">
-    <!-- Header -->
-    <div style="background:linear-gradient(135deg,#1e3a8a 0%,#2563eb 100%);padding:36px 40px 28px;text-align:center;">
-      <div style="display:inline-block;background:rgba(255,255,255,0.15);border-radius:50%;padding:14px;margin-bottom:14px;">
-        <span style="font-size:32px;">&#127891;</span>
-      </div>
-      <h1 style="margin:0;color:#ffffff;font-size:26px;font-weight:700;letter-spacing:-0.3px;">You're Invited!</h1>
-      <p style="margin:8px 0 0;color:#bfdbfe;font-size:15px;">Tutoring Referral Program</p>
-    </div>
-    <!-- Body -->
-    <div style="padding:36px 40px;">
-      <p style="margin:0 0 12px;color:#0f172a;font-size:16px;">Hi <strong>${input.name}</strong>,</p>
-      <p style="margin:0 0 20px;color:#475569;font-size:15px;line-height:1.6;">You have been added as a <strong>Promoter</strong> for our tutoring referral program. Create your account to access your personal dashboard and start earning referral credits.</p>
-      <!-- Earnings highlight -->
-      <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:18px 22px;margin-bottom:24px;">
-        <table style="width:100%;border-collapse:collapse;">
-          <tr>
-            <td style="text-align:center;padding:8px;">
-              <div style="font-size:28px;font-weight:800;color:#1d4ed8;">$50</div>
-              <div style="font-size:12px;color:#3b82f6;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Per Student Enrolled</div>
-            </td>
-            <td style="width:1px;background:#bfdbfe;"></td>
-            <td style="text-align:center;padding:8px;">
-              <div style="font-size:28px;font-weight:800;color:#1d4ed8;">$25</div>
-              <div style="font-size:12px;color:#3b82f6;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Per Product Enrolled</div>
-            </td>
-          </tr>
-        </table>
-      </div>
-      <!-- CTA Button -->
-      <div style="text-align:center;margin:28px 0;">
-        <a href="${setupUrl}" style="display:inline-block;background:linear-gradient(135deg,#1e3a8a,#2563eb);color:#ffffff;padding:15px 36px;border-radius:8px;text-decoration:none;font-size:16px;font-weight:700;letter-spacing:0.2px;box-shadow:0 4px 12px rgba(37,99,235,0.35);">Create My Account &rarr;</a>
-      </div>
-      <!-- Steps -->
-      <div style="background:#f8fafc;border-radius:10px;padding:18px 22px;margin-bottom:20px;">
-        <p style="margin:0 0 10px;font-size:13px;font-weight:700;color:#0f172a;text-transform:uppercase;letter-spacing:0.5px;">Getting Started</p>
-        <table style="width:100%;border-collapse:collapse;">
-          <tr><td style="padding:5px 0;vertical-align:top;"><span style="display:inline-block;background:#2563eb;color:#fff;border-radius:50%;width:20px;height:20px;text-align:center;line-height:20px;font-size:11px;font-weight:700;margin-right:10px;">1</span></td><td style="padding:5px 0;color:#475569;font-size:14px;">Click the button above to create your account</td></tr>
-          <tr><td style="padding:5px 0;vertical-align:top;"><span style="display:inline-block;background:#2563eb;color:#fff;border-radius:50%;width:20px;height:20px;text-align:center;line-height:20px;font-size:11px;font-weight:700;margin-right:10px;">2</span></td><td style="padding:5px 0;color:#475569;font-size:14px;">Set your email address and password</td></tr>
-          <tr><td style="padding:5px 0;vertical-align:top;"><span style="display:inline-block;background:#2563eb;color:#fff;border-radius:50%;width:20px;height:20px;text-align:center;line-height:20px;font-size:11px;font-weight:700;margin-right:10px;">3</span></td><td style="padding:5px 0;color:#475569;font-size:14px;">Add parents &amp; students and track your earnings</td></tr>
-        </table>
-      </div>
-      <!-- Fallback link -->
-      <p style="font-size:12px;color:#94a3b8;margin:0;">Can't click the button? Copy this link into your browser:<br/><a href="${setupUrl}" style="color:#2563eb;word-break:break-all;">${setupUrl}</a></p>
-    </div>
-    <!-- Footer -->
-    <div style="background:#f1f5f9;padding:18px 40px;text-align:center;border-top:1px solid #e2e8f0;">
-      <p style="margin:0 0 4px;color:#64748b;font-size:12px;font-weight:600;">Tutoring Referral Manager</p>
-      <p style="margin:0;color:#94a3b8;font-size:11px;">This invitation link expires in <strong>7 days</strong>. If you did not expect this email, you can safely ignore it.</p>
-    </div>
-  </div>
-</body>
-</html>`,
+      const { sent } = await issuePromoterSetupInvite({
+        userId: newPromoter.id,
+        promoterName: input.name,
+        email: input.email,
+        ctx,
+        origin: input.origin,
+        variant: "invite",
+      });
+      if (!sent) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Unable to send the setup email right now. Please verify email settings and try again.",
         });
-      } catch (err) {
-        console.error("[Email] Failed to send registration email:", err);
       }
 
       return { success: true };
@@ -433,37 +485,20 @@ const adminRouter = router({
       if (!promoter || promoter.role !== "promoter") throw new TRPCError({ code: "NOT_FOUND" });
       if (!promoter.email) throw new TRPCError({ code: "BAD_REQUEST", message: "Promoter has no email" });
 
-      const { nanoid } = await import("nanoid");
-      const token = nanoid(48);
-      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-      await createInvite(promoter.id, token, expiresAt);
-
-      const origin =
-        input.origin ||
-        (ctx.req.headers["x-forwarded-host"]
-          ? `https://${ctx.req.headers["x-forwarded-host"]}`
-          : `${ctx.req.protocol}://${ctx.req.headers.host}`);
-      const setupUrl = `${origin}/setup/${token}`;
-
-      await sendEmail({
-        to: promoter.email,
-        subject: `Your account setup link for the Tutoring Referral Program`,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
-            <div style="background: #1e40af; padding: 24px; border-radius: 8px 8px 0 0; text-align: center;">
-              <h1 style="color: #fff; margin: 0; font-size: 24px;">Account Setup Link</h1>
-            </div>
-            <div style="background: #f9fafb; padding: 24px; border-radius: 0 0 8px 8px; border: 1px solid #e5e7eb;">
-              <p style="font-size: 16px;">Hi <strong>${promoter.name || "Promoter"}</strong>,</p>
-              <p style="font-size: 16px;">Here is your new account setup link. Click the button below to set your password and access your promoter dashboard.</p>
-              <div style="text-align: center; margin: 28px 0;">
-                <a href="${setupUrl}" style="background: #1e40af; color: #fff; padding: 14px 28px; border-radius: 6px; text-decoration: none; font-size: 16px; font-weight: bold;">Set Up My Account</a>
-              </div>
-              <p style="font-size: 13px; color: #6b7280;">This link expires in <strong>7 days</strong>.</p>
-            </div>
-          </div>
-        `,
+      const { sent } = await issuePromoterSetupInvite({
+        userId: promoter.id,
+        promoterName: promoter.name || "Promoter",
+        email: promoter.email,
+        ctx,
+        origin: input.origin,
+        variant: "resend",
       });
+      if (!sent) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Unable to resend the setup email right now. Please verify email settings and try again.",
+        });
+      }
 
       return { success: true };
     }),
@@ -701,6 +736,78 @@ const promoterRouter = router({
 // ─── Invite / Credentials Router ─────────────────────────────────────────────
 
 const inviteRouter = router({
+  register: publicProcedure
+    .input(
+      z.object({
+        firstName: z.string().trim().min(1, "First name is required").max(255),
+        lastName: z.string().trim().min(1, "Last name is required").max(255),
+        email: z.string().trim().email("Valid email required"),
+        phone: z.string().trim().min(7, "Phone number is required").max(50),
+        city: z.string().trim().min(1, "City is required").max(255),
+        state: z.string().trim().min(1, "State is required").max(100),
+        origin: z.string().optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const email = input.email.toLowerCase();
+      const fullName = `${input.firstName} ${input.lastName}`.trim();
+
+      const existingCredentials = await getCredentialsByEmail(email);
+      if (existingCredentials) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "An account with this email already exists. Please sign in instead.",
+        });
+      }
+
+      const existingUser = await getUserByEmail(email);
+      if (existingUser && existingUser.role !== "promoter") {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "This email is already linked to another account.",
+        });
+      }
+
+      if (!existingUser) {
+        await createPromoter({ name: fullName, email });
+      } else {
+        await updatePromoter(existingUser.id, { name: fullName, email });
+      }
+
+      const promoter = existingUser ?? (await getUserByEmail(email));
+      if (!promoter) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Unable to create your account. Please try again.",
+        });
+      }
+
+      await upsertPromoterProfile(promoter.id, {
+        firstName: input.firstName,
+        lastName: input.lastName,
+        phone: input.phone,
+        city: input.city,
+        state: input.state,
+      });
+
+      const { sent } = await issuePromoterSetupInvite({
+        userId: promoter.id,
+        promoterName: fullName,
+        email,
+        ctx,
+        origin: input.origin,
+        variant: "signup",
+      });
+      if (!sent) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "We couldn't send your setup email right now. Please try again shortly.",
+        });
+      }
+
+      return { success: true, email };
+    }),
+
   // Public: resolve an invite token to see promoter name (for the setup page)
   resolve: publicProcedure
     .input(z.object({ token: z.string() }))

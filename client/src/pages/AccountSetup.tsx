@@ -68,7 +68,7 @@ export default function AccountSetup() {
     onSuccess: (data) => {
       setWelcomeName(data.name);
       setSuccess(true);
-      setTimeout(() => navigate("/promoter/dashboard"), 3000);
+      setTimeout(() => navigate("/promoter"), 3000);
     },
     onError: (err) => {
       setFormError(err.message);

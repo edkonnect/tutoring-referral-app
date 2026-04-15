@@ -9,6 +9,29 @@ vi.mock("./db", async (importOriginal) => {
   return {
     ...actual,
     createPromoter: vi.fn().mockResolvedValue(undefined),
+    updatePromoter: vi.fn().mockResolvedValue(undefined),
+    getUserByEmail: vi.fn().mockImplementation(async (email: string) => {
+      if (email === "jane@example.com" || email === "test@example.com") {
+        return {
+          id: 10,
+          name: email === "test@example.com" ? "Test User" : "Jane Doe",
+          email,
+          role: "promoter",
+          openId: "jane-open-id",
+        };
+      }
+      if (email === "admin@example.com") {
+        return {
+          id: 1,
+          name: "Admin",
+          email,
+          role: "admin",
+          openId: "admin-open-id",
+        };
+      }
+      return undefined;
+    }),
+    upsertPromoterProfile: vi.fn().mockResolvedValue(undefined),
     getSetting: vi.fn().mockResolvedValue(50),
   getAllSettings: vi.fn().mockResolvedValue({ referralFee: "50.00", productReferralFee: "25.00" }),
   upsertSetting: vi.fn().mockResolvedValue(undefined),
@@ -69,7 +92,7 @@ vi.mock("./_core/sdk", () => ({
 // ─── Mock email ───────────────────────────────────────────────────────────────
 
 vi.mock("./_core/email", () => ({
-  sendEmail: vi.fn().mockResolvedValue(undefined),
+  sendEmail: vi.fn().mockResolvedValue(true),
 }));
 
 // ─── Context helpers ──────────────────────────────────────────────────────────
@@ -129,6 +152,40 @@ describe("invite.resolve", () => {
     const ctx = makePublicCtx();
     const caller = appRouter.createCaller(ctx);
     await expect(caller.invite.resolve({ token: "expired-token" })).rejects.toThrow("expired");
+  });
+});
+
+describe("invite.register", () => {
+  it("creates or refreshes a promoter signup invite and sends email", async () => {
+    const ctx = makePublicCtx();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.invite.register({
+      firstName: "Jane",
+      lastName: "Doe",
+      email: "jane@example.com",
+      phone: "555-111-2222",
+      city: "Atlanta",
+      state: "GA",
+      origin: "https://example.com",
+    });
+
+    expect(result).toEqual({ success: true, email: "jane@example.com" });
+  });
+
+  it("rejects signup when the email already has credentials", async () => {
+    const ctx = makePublicCtx();
+    const caller = appRouter.createCaller(ctx);
+
+    await expect(
+      caller.invite.register({
+        firstName: "Taken",
+        lastName: "User",
+        email: "taken@example.com",
+        phone: "555-111-2222",
+        city: "Atlanta",
+        state: "GA",
+      })
+    ).rejects.toThrow("already exists");
   });
 });
 

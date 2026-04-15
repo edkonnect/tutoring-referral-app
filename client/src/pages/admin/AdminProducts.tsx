@@ -12,7 +12,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Percent, 
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -20,7 +20,7 @@ import { Percent,
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Percent, 
+import { Percent,
   Plus, Pencil, Trash2, Package, DollarSign, Tag, Loader2, Search,
   CheckCircle, XCircle, BarChart2, Eye, ChevronRight, LayoutTemplate,
 } from "lucide-react";

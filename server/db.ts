@@ -1,6 +1,22 @@
 import { and, count, desc, eq, gte, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, appSettings, parents, productEnrollments, productPromotions, products, promoTemplates, promoterCredentials, promoterInvites, referralLinkVisits, referrals, students, users, promoCodes } from "../drizzle/schema";
+import {
+  InsertUser,
+  appSettings,
+  parents,
+  productEnrollments,
+  productPromotions,
+  products,
+  promoTemplates,
+  promoterCredentials,
+  promoterInvites,
+  promoterProfiles,
+  promoCodes,
+  referralLinkVisits,
+  referrals,
+  students,
+  users,
+} from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -60,6 +76,13 @@ export async function getUserByOpenId(openId: string) {
   const db = await getDb();
   if (!db) return undefined;
   const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getUserByEmail(email: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
   return result.length > 0 ? result[0] : undefined;
 }
 
@@ -410,6 +433,33 @@ export async function getCredentialsByEmail(email: string) {
   if (!db) return undefined;
   const result = await db.select().from(promoterCredentials).where(eq(promoterCredentials.email, email)).limit(1);
   return result.length > 0 ? result[0] : undefined;
+}
+
+export async function upsertPromoterProfile(
+  userId: number,
+  data: {
+    firstName: string;
+    lastName: string;
+    phone: string;
+    city: string;
+    state: string;
+  }
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db
+    .insert(promoterProfiles)
+    .values({ userId, ...data })
+    .onDuplicateKeyUpdate({
+      set: {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        phone: data.phone,
+        city: data.city,
+        state: data.state,
+      },
+    });
 }
 
 // ─── Products ────────────────────────────────────────────────────────────────

@@ -114,6 +114,22 @@ export const promoterCredentials = mysqlTable("promoter_credentials", {
 export type PromoterCredential = typeof promoterCredentials.$inferSelect;
 export type InsertPromoterCredential = typeof promoterCredentials.$inferInsert;
 
+// Extra registration details collected when a promoter self-signs up.
+export const promoterProfiles = mysqlTable("promoter_profiles", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().unique(),
+  firstName: varchar("firstName", { length: 255 }).notNull(),
+  lastName: varchar("lastName", { length: 255 }).notNull(),
+  phone: varchar("phone", { length: 50 }).notNull(),
+  city: varchar("city", { length: 255 }).notNull(),
+  state: varchar("state", { length: 100 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type PromoterProfile = typeof promoterProfiles.$inferSelect;
+export type InsertPromoterProfile = typeof promoterProfiles.$inferInsert;
+
 // Promotional email templates created by admin and associated with products
 export const promoTemplates = mysqlTable("promo_templates", {
   id: int("id").autoincrement().primaryKey(),

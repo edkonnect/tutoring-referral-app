@@ -768,3 +768,24 @@ export async function getPromoCodesByPromoter(promoterId: number) {
   if (!db) return [];
   return db.select().from(promoCodes).where(eq(promoCodes.promoterId, promoterId)).orderBy(desc(promoCodes.createdAt));
 }
+
+export async function getPromoCodeByCode(code: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const results = await db
+    .select({ promo: promoCodes, parentEmail: parents.email })
+    .from(promoCodes)
+    .leftJoin(parents, eq(promoCodes.parentId, parents.id))
+    .where(eq(promoCodes.code, code));
+  if (!results[0]) return null;
+  return { ...results[0].promo, parentEmail: results[0].parentEmail };
+}
+
+export async function redeemPromoCode(code: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db
+    .update(promoCodes)
+    .set({ status: "used", usedAt: new Date() })
+    .where(eq(promoCodes.code, code));
+}

@@ -67,6 +67,8 @@ import {
   getPromoCodesByParent,
   getPromoCodesByPromoter,
   getPromoCodeByPromotion,
+  getPromoCodeByCode,
+  redeemPromoCode,
   upsertSetting,
   getSetting,
   SETTING_KEYS,
@@ -77,6 +79,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { sendEmail } from "./_core/email";
 import { sdk } from "./_core/sdk";
+import { ENV } from "./_core/env";
 
 // ─── Role-based middleware ────────────────────────────────────────────────────
 
@@ -1436,6 +1439,42 @@ const promoCodesRouter = router({
   myList: promoterProcedure.query(async ({ ctx }) => {
     return getPromoCodesByPromoter(ctx.user.id);
   }),
+
+  // Called by the tutor marketplace at checkout to check if a code is valid for a specific parent email
+  validate: publicProcedure
+    .input(z.object({ code: z.string(), parentEmail: z.string().email() }))
+    .query(async ({ input }) => {
+      const promo = await getPromoCodeByCode(input.code.toUpperCase());
+      if (!promo || promo.status !== "active") {
+        return { valid: false, discount: null, code: input.code, reason: "invalid_or_used" };
+      }
+      if (promo.parentEmail?.toLowerCase() !== input.parentEmail.toLowerCase()) {
+        return { valid: false, discount: null, code: input.code, reason: "email_mismatch" };
+      }
+      return { valid: true, discount: Number(promo.discount), code: promo.code, reason: null };
+    }),
+
+  // Called by the tutor marketplace after payment succeeds to consume the code (one-time use)
+  // Requires the shared MARKETPLACE_API_KEY
+  redeem: publicProcedure
+    .input(z.object({ code: z.string(), parentEmail: z.string().email(), apiKey: z.string() }))
+    .mutation(async ({ input }) => {
+      if (!ENV.marketplaceApiKey || input.apiKey !== ENV.marketplaceApiKey) {
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid API key" });
+      }
+      const promo = await getPromoCodeByCode(input.code.toUpperCase());
+      if (!promo) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Promo code not found" });
+      }
+      if (promo.status !== "active") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Promo code is already ${promo.status}` });
+      }
+      if (promo.parentEmail?.toLowerCase() !== input.parentEmail.toLowerCase()) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Promo code does not belong to this email" });
+      }
+      await redeemPromoCode(input.code.toUpperCase());
+      return { success: true };
+    }),
 });
 
 export const appRouter = router({

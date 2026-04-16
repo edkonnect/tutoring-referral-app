@@ -14,4 +14,5 @@ export const ENV = {
   emailFrom: process.env.EMAIL_FROM ?? "",
   gmailUser: process.env.GMAIL_USER ?? "",
   gmailAppPassword: process.env.GMAIL_APP_PASSWORD ?? "",
+  marketplaceApiKey: process.env.MARKETPLACE_API_KEY ?? "",
 };
